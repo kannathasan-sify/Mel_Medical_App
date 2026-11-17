@@ -40,6 +40,7 @@ fun ScribeRecordingScreen(
     isTranscribing: Boolean = false,
     audioFilePath: String? = null,
     isTranslating: Boolean = false,
+    isGeneratingSummary: Boolean = false,
     selectedTargetLanguage: String = "Spanish",
     onTargetLanguageChanged: (String) -> Unit = {},
     onTranslateClicked: () -> Unit = {},
@@ -630,15 +631,56 @@ fun ScribeRecordingScreen(
                     }
                     RecordingState.STOPPED -> {
                         Column(modifier = Modifier.fillMaxWidth()) {
+                            if (isGeneratingSummary) {
+                                Card(
+                                    shape = RoundedCornerShape(10.dp),
+                                    colors = CardDefaults.cardColors(containerColor = MelColors.AquaGreen.copy(alpha = 0.15f)),
+                                    border = BorderStroke(1.dp, MelColors.AquaGreen),
+                                    modifier = Modifier.fillMaxWidth().padding(bottom = 10.dp)
+                                ) {
+                                    Row(
+                                        modifier = Modifier.padding(12.dp),
+                                        verticalAlignment = Alignment.CenterVertically
+                                    ) {
+                                        Box(
+                                            modifier = Modifier
+                                                .size(10.dp)
+                                                .background(MelColors.AquaGreen, CircleShape)
+                                        )
+                                        Spacer(modifier = Modifier.width(10.dp))
+                                        Column {
+                                            Text(
+                                                text = "⚡ Clinical AI Backend Call in Progress",
+                                                fontWeight = FontWeight.Bold,
+                                                fontSize = 12.sp,
+                                                color = MelColors.DeepBlue
+                                            )
+                                            Text(
+                                                text = "Analyzing your spoken symptoms with GPT-4o. Please wait a moment...",
+                                                fontSize = 11.sp,
+                                                color = MelColors.TextMuted
+                                            )
+                                        }
+                                    }
+                                }
+                            }
+
                             Button(
                                 onClick = onViewSummaryClicked,
+                                enabled = !isGeneratingSummary,
                                 colors = ButtonDefaults.buttonColors(containerColor = MelColors.SkyBlue),
                                 shape = RoundedCornerShape(14.dp),
                                 modifier = Modifier
                                     .fillMaxWidth()
                                     .height(52.dp)
                             ) {
-                                Text("Generate Plain Medical Summary →", fontSize = 15.sp, fontWeight = FontWeight.Bold)
+                                if (isGeneratingSummary) {
+                                    CircularProgressIndicator(modifier = Modifier.size(18.dp), color = Color.White, strokeWidth = 2.dp)
+                                    Spacer(modifier = Modifier.width(10.dp))
+                                    Text("Calling Clinical AI... Please Wait", fontSize = 14.sp, fontWeight = FontWeight.Bold)
+                                } else {
+                                    Text("Generate Plain Medical Summary →", fontSize = 15.sp, fontWeight = FontWeight.Bold)
+                                }
                             }
                             Spacer(modifier = Modifier.height(8.dp))
                             OutlinedButton(

@@ -90,55 +90,25 @@ class ClinicalIntelligenceService:
                     "When should repeat testing or evaluation take place?"
                 ]
             }
-        overview = (
-            "During your visit, your doctor reviewed your kidney and bladder symptoms. Because your previous antibiotic could not be swallowed, your provider has referred you to the Emergency Department for immediate intravenous (IV) antibiotics."
-            if reading_level == "simple"
-            else "Your healthcare provider evaluated your symptoms following your accident and untreated urinary infection. Given persistent flank pain and inability to swallow Macrobid tablets, your provider suspecting pyelonephritis has urgently referred you to the Emergency Department for IV antibiotics."
-        )
+        overview = f"During your consultation, the discussion focused on: {dialogue_summary}" if dialogue_summary else "Consultation audio was recorded and analyzed."
+        
+        # Detect fever / common symptoms dynamically
+        all_text = " ".join(lines).lower()
+        diagnoses = ["Clinical Encounter Assessment"]
+        if "fever" in all_text or "temperature" in all_text or "chills" in all_text:
+            diagnoses = ["Acute Febrile Episode (Fever)"]
 
         return {
             "plain_language_overview": overview,
-            "symptoms_reported": [
-                "Severe flank pain and burning sensation",
-                "Dysphagia (inability to swallow solid Macrobid tablets)",
-                "Neck strain and right ear fullness post-MVA",
-                "Palpable reducible umbilical hernia"
-            ],
-            "provider_explanations": [
-                "Ascending urinary infection has likely progressed toward the kidneys (pyelonephritis)",
-                "Missed oral antibiotic therapy necessitates immediate parenteral treatment",
-                "Umbilical hernia is reducible; observe closely for strangulation signs"
-            ],
-            "diagnoses_explicit": [
-                "Acute Pyelonephritis (Suspected - Pending Emergency Evaluation)",
-                "Reducible Umbilical Hernia",
-                "Right Cervical Strain"
-            ],
-            "medications_discussed": [
-                {
-                    "name": "Macrobid (Nitrofurantoin)",
-                    "dosage": "100mg",
-                    "frequency": "Twice daily",
-                    "instructions": "Prescribed at ER; untaken due to pill swallowing difficulty.",
-                    "concerns_flagged": "High priority: Request liquid suspension or IV alternative"
-                }
-            ],
-            "treatment_plan": [
-                "Immediate evaluation at Emergency Department for intravenous antibiotics",
-                "Follow-up clinic visit on Tuesday at 11:15 AM",
-                "ENT referral for post-accident hearing changes",
-                "Wear supportive abdominal garments for hernia"
-            ],
-            "unanswered_questions": [
-                "What liquid antibiotic options can be prescribed once discharged from the ED?",
-                "What warning signs should prompt urgent surgical evaluation for the umbilical hernia?",
-                "Who will coordinate physical therapy or follow-up for the cervical spine strain?"
-            ],
+            "symptoms_reported": patient_lines if patient_lines else ["Symptoms reviewed during consultation"],
+            "provider_explanations": provider_lines if provider_lines else ["Clinical recommendations discussed by provider"],
+            "diagnoses_explicit": diagnoses,
+            "medications_discussed": [],
+            "treatment_plan": provider_lines if provider_lines else ["Follow provider instructions and monitor symptoms."],
+            "unanswered_questions": ["What additional steps should be confirmed before discharge?"],
             "follow_up_questions": [
-                "Since I cannot swallow large pills, can my outpatient antibiotic be prescribed as a liquid suspension or crushable tablet?",
-                "What symptoms should I monitor at home that would indicate my hernia has become strangulated?",
-                "What specific tests will be run during my Emergency Department evaluation today?",
-                "Could my recent hearing loss and ear fullness be directly related to the airbag or steering wheel impact?"
+                "What warning signs should prompt an earlier clinic or emergency visit?",
+                "When should repeat testing or evaluation take place?"
             ]
         }
 

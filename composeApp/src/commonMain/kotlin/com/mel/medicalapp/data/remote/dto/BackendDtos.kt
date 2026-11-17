@@ -70,3 +70,9 @@ data class BackendExplainTermResponse(
     val category: String = "General Health"
 )
 
+@Serializable
+data class BackendTranscriptionResponse(
+    val text: String = "",
+    val status: String = ""
+)
+

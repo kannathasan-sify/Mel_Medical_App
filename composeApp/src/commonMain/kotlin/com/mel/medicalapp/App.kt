@@ -65,6 +65,7 @@ fun App() {
     var isTranscribing by remember { mutableStateOf(false) }
     var recordedAudioPath by remember { mutableStateOf<String?>(null) }
     var isTranslating by remember { mutableStateOf(false) }
+    var isGeneratingSummary by remember { mutableStateOf(false) }
     var selectedTargetLanguage by remember { mutableStateOf("Spanish") }
 
     // AI Intelligence state
@@ -356,6 +357,7 @@ fun App() {
                 isTranscribing = isTranscribing,
                 audioFilePath = recordedAudioPath,
                 isTranslating = isTranslating,
+                isGeneratingSummary = isGeneratingSummary,
                 selectedTargetLanguage = selectedTargetLanguage,
                 onTargetLanguageChanged = { selectedTargetLanguage = it },
                 onTranslateClicked = {
@@ -426,15 +428,42 @@ fun App() {
                         recordedAudioPath = filePath
                         isTranscribing = true
                         
-                        val liveSegments = transcriptSegments
-                        val segments = if (liveSegments.isNotEmpty()) {
-                            liveSegments
-                        } else {
-                            val transcribeRes = speechEngine.transcribeAudio(
-                                consultationId = "cons-001",
-                                audioFilePath = filePath
-                            )
-                            transcribeRes.getOrDefault(emptyList())
+                        var segments = transcriptSegments
+                        // If no live speech segments were detected, transcribe the recorded audio file via Whisper API
+                        if (segments.isEmpty() && filePath.isNotBlank()) {
+                            try {
+                                val file = java.io.File(filePath)
+                                if (file.exists() && file.length() > 0) {
+                                    println("MEL_AI_WHISPER: Sending recorded audio (${file.length()} bytes) to Whisper STT API...")
+                                    val whisperRes = backendApiClient.transcribeAudio(file.readBytes(), file.name)
+                                    when (whisperRes) {
+                                        is NetworkResult.Success -> {
+                                            val recognizedText = whisperRes.data.trim()
+                                            println("MEL_AI_WHISPER_SUCCESS: Recognized -> \"$recognizedText\"")
+                                            if (recognizedText.isNotBlank()) {
+                                                segments = listOf(
+                                                    TranscriptSegment(
+                                                        id = "seg-whisper-1",
+                                                        consultationId = "cons-001",
+                                                        sequenceOrder = 1,
+                                                        startTimeMs = 0L,
+                                                        endTimeMs = (elapsedSeconds * 1000).toLong(),
+                                                        speaker = SpeakerRole.PATIENT,
+                                                        text = recognizedText,
+                                                        confidence = 0.99
+                                                    )
+                                                )
+                                            }
+                                        }
+                                        is NetworkResult.Error -> {
+                                            println("MEL_AI_WHISPER_NOTE: Whisper response: ${whisperRes.error.message}")
+                                        }
+                                        else -> {}
+                                    }
+                                }
+                            } catch (e: Exception) {
+                                println("MEL_AI_WHISPER_EXCEPTION: ${e.message}")
+                            }
                         }
                         isTranscribing = false
                         transcriptSegments = segments
@@ -467,26 +496,35 @@ fun App() {
                 },
                 onViewSummaryClicked = {
                     coroutineScope.launch {
-                        val intelligenceRes = intelligenceEngine.generateVisitSummary(
-                            consultationId = "cons-001",
-                            segments = transcriptSegments
-                        )
-                        intelligenceRes.onSuccess { (summary, questions) ->
-                            currentSummary = summary
-                            currentQuestions = questions
-                            val newVisit = HistoricalVisitItem(
-                                id = "cons-${historyVisits.size + 1}",
-                                dateDisplay = "Today, Just Now",
-                                visitType = "Scribe Consultation Recording",
-                                providerName = "Attending Physician",
-                                primaryFocus = summary.diagnosesExplicit.firstOrNull() ?: "Urgent Clinical Evaluation",
-                                status = com.mel.medicalapp.domain.model.ConsultationStatus.COMPLETED,
-                                keyFindings = summary.symptomsReported.take(3).ifEmpty { listOf("Consultation dialogue translated into plain English") },
-                                pendingQuestionsCount = questions.size
+                        isGeneratingSummary = true
+                        try {
+                            println("MEL_AI_FLOW: Initiating clinical summary synthesis for ${transcriptSegments.size} segments...")
+                            val intelligenceRes = intelligenceEngine.generateVisitSummary(
+                                consultationId = "cons-001",
+                                segments = transcriptSegments
                             )
-                            historyService.saveVisit(newVisit)
-                            historyVisits = historyService.getPatientTimeline(currentPatientId ?: "patient-id")
-                            currentScreen = Screen.Summary
+                            intelligenceRes.onSuccess { (summary, questions) ->
+                                println("MEL_AI_FLOW: Summary generated successfully! Diagnoses: ${summary.diagnosesExplicit}")
+                                currentSummary = summary
+                                currentQuestions = questions
+                                val newVisit = HistoricalVisitItem(
+                                    id = "cons-${historyVisits.size + 1}",
+                                    dateDisplay = "Today, Just Now",
+                                    visitType = "Scribe Consultation Recording",
+                                    providerName = "Attending Physician",
+                                    primaryFocus = summary.diagnosesExplicit.firstOrNull() ?: "Urgent Clinical Evaluation",
+                                    status = com.mel.medicalapp.domain.model.ConsultationStatus.COMPLETED,
+                                    keyFindings = summary.symptomsReported.take(3).ifEmpty { listOf("Consultation dialogue translated into plain English") },
+                                    pendingQuestionsCount = questions.size
+                                )
+                                historyService.saveVisit(newVisit)
+                                historyVisits = historyService.getPatientTimeline(currentPatientId ?: "patient-id")
+                                currentScreen = Screen.Summary
+                            }.onFailure { err ->
+                                println("MEL_AI_FLOW_ERROR: Summary synthesis failed: ${err.message}")
+                            }
+                        } finally {
+                            isGeneratingSummary = false
                         }
                     }
                 },

@@ -7,6 +7,7 @@ import com.mel.medicalapp.data.remote.dto.*
 import io.ktor.client.*
 import io.ktor.client.call.*
 import io.ktor.client.request.*
+import io.ktor.client.request.forms.*
 import io.ktor.client.statement.*
 import io.ktor.http.*
 
@@ -106,6 +107,38 @@ class MelBackendApiClient(
             }
         } catch (e: Exception) {
             NetworkResult.Error(AppError.networkError("Failed to connect to MEL learning service: ${e.message}"))
+        }
+    }
+
+    /**
+     * Transcribes actual recorded audio bytes using OpenAI Whisper via the backend API.
+     */
+    suspend fun transcribeAudio(
+        audioBytes: ByteArray,
+        filename: String = "recording.m4a"
+    ): NetworkResult<String> {
+        return try {
+            val response: HttpResponse = httpClient.submitFormWithBinaryData(
+                url = "$baseUrl/api/v1/consultations/transcribe",
+                formData = formData {
+                    append("file", audioBytes, Headers.build {
+                        append(HttpHeaders.ContentType, "audio/m4a")
+                        append(HttpHeaders.ContentDisposition, "filename=\"$filename\"")
+                    })
+                }
+            )
+            if (response.status.isSuccess()) {
+                val data = response.body<BackendTranscriptionResponse>()
+                println("MEL_BACKEND_WHISPER: Received transcription: \"${data.text}\"")
+                NetworkResult.Success(data.text)
+            } else {
+                val err = response.bodyAsText()
+                println("MEL_BACKEND_WHISPER: Transcription error response: $err")
+                NetworkResult.Error(AppError.serverError("Transcription failed: ${response.status}"))
+            }
+        } catch (e: Exception) {
+            println("MEL_BACKEND_WHISPER: Network error transcribing audio: ${e.message}")
+            NetworkResult.Error(AppError.networkError("Transcription network error: ${e.message}"))
         }
     }
 }
