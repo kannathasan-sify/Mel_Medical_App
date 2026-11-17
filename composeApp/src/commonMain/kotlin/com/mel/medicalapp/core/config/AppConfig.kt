@@ -32,7 +32,7 @@ object AppConfig {
     // ------------------------------------------------------------------------
     // BACKEND API CONFIGURATION (FastAPI)
     // ------------------------------------------------------------------------
-    const val BACKEND_URL = "http://192.168.1.7:8000"
-    const val BACKEND_URL_FALLBACK = "http://127.0.0.1:8000"
+    const val BACKEND_URL = "https://mel-medical-app.onrender.com"
+    const val BACKEND_URL_FALLBACK = "http://10.0.2.2:8000"
     const val BACKEND_URL_EMULATOR = "http://10.0.2.2:8000"
 }
