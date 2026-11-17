@@ -41,6 +41,16 @@ app.include_router(consultation_router, prefix=settings.API_V1_PREFIX)
 # Register WebSockets
 app.include_router(websocket_router)
 
+@app.get("/", tags=["Root"])
+async def root():
+    return {
+        "status": "online",
+        "service": "MEL - Medical Empowerment Liaison API",
+        "version": settings.VERSION,
+        "docs_url": f"{settings.API_V1_PREFIX}/docs",
+        "health_check": "/health"
+    }
+
 @app.get("/health", tags=["Operational Health"])
 async def health_check():
     return {
