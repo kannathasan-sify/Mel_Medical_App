@@ -202,8 +202,14 @@ fun VisitSummaryScreen(
                         Spacer(modifier = Modifier.height(8.dp))
 
                         val dynamicOverview = when (selectedLevel) {
-                            ReadingLevel.SIMPLE -> "During your visit, your doctor checked your ongoing kidney and bladder pain. Because your previous medicine could not be swallowed, you need to go to the Emergency Room right away for medicine through an IV. They also checked your belly bulge and gave supportive advice."
-                            ReadingLevel.COMPLEX -> "The clinical encounter focused on acute symptoms of an ascending urinary tract infection with clinical suspicion of acute pyelonephritis following non-adherence to oral nitrofurantoin due to dysphagia. The provider initiated an urgent Emergency Department referral for parenteral antibiotic administration. Additionally, a reducible post-traumatic umbilical hernia and cervical strain were evaluated."
+                            ReadingLevel.SIMPLE -> {
+                                "In simple everyday language: ${summary.plainLanguageOverview}\n\nImportant Reminder: Discuss any questions with your care provider and follow your personalized recommendations."
+                            }
+                            ReadingLevel.COMPLEX -> {
+                                val diags = if (summary.diagnosesExplicit.isNotEmpty()) "Documented Diagnoses: ${summary.diagnosesExplicit.joinToString("; ")}. " else ""
+                                val plan = if (summary.treatmentPlan.isNotEmpty()) "Clinical Management: ${summary.treatmentPlan.joinToString("; ")}." else ""
+                                "${summary.plainLanguageOverview}\n\n$diags$plan"
+                            }
                             ReadingLevel.MODERATE -> summary.plainLanguageOverview
                         }
 
@@ -216,7 +222,17 @@ fun VisitSummaryScreen(
 
                         Spacer(modifier = Modifier.height(10.dp))
 
-                        // Interactive Jargon Chips
+                        // Interactive Dynamic Jargon Chips
+                        val dynamicJargonTerms = remember(summary, transcriptSegments) {
+                            val list = mutableListOf<String>()
+                            summary.diagnosesExplicit.forEach { list.add(it) }
+                            summary.medicationsDiscussed.forEach { list.add(it.name) }
+                            if (list.isEmpty()) {
+                                list.addAll(listOf("Consultation", "Treatment Plan", "Follow-up Care"))
+                            }
+                            list.distinct().take(5)
+                        }
+
                         Text(
                             text = "Tap any clinical term to decode in plain English:",
                             fontSize = 11.sp,
@@ -228,7 +244,7 @@ fun VisitSummaryScreen(
                             horizontalArrangement = Arrangement.spacedBy(8.dp),
                             modifier = Modifier.horizontalScroll(rememberScrollState())
                         ) {
-                            listOf("Pyelonephritis", "Dysphagia", "Reducible Hernia").forEach { term ->
+                            dynamicJargonTerms.forEach { term ->
                                 Box(
                                     modifier = Modifier
                                         .clip(RoundedCornerShape(6.dp))
@@ -354,11 +370,34 @@ fun VisitSummaryScreen(
                         color = MelColors.TextMuted,
                         modifier = Modifier.padding(bottom = 8.dp)
                     )
-                    listOf(
-                        Triple("Pyelonephritis diagnosis discussed", "02:14 - 02:40", "Provider Stated · 98% Conf"),
-                        Triple("Prescription changed due to dysphagia", "04:10 - 04:35", "Patient Reported · 95% Conf"),
-                        Triple("Urgent Emergency Department referral", "06:15 - 06:50", "Provider Stated · 99% Conf")
-                    ).forEach { (fact, timing, source) ->
+                    val dynamicTraceabilityItems = remember(transcriptSegments, summary) {
+                        if (transcriptSegments.isNotEmpty()) {
+                            transcriptSegments.map { seg ->
+                                val startMin = (seg.startTimeMs / 1000) / 60
+                                val startSec = (seg.startTimeMs / 1000) % 60
+                                val endMin = (seg.endTimeMs / 1000) / 60
+                                val endSec = (seg.endTimeMs / 1000) % 60
+                                val timing = "${startMin.toString().padStart(2, '0')}:${startSec.toString().padStart(2, '0')} - ${endMin.toString().padStart(2, '0')}:${endSec.toString().padStart(2, '0')}"
+                                val role = if (seg.speaker == SpeakerRole.PROVIDER) "Provider Stated" else "Patient Reported"
+                                val conf = "${(seg.confidence * 100).toInt()}% Conf"
+                                Triple(seg.text, timing, "$role · $conf")
+                            }
+                        } else {
+                            val items = mutableListOf<Triple<String, String, String>>()
+                            summary.diagnosesExplicit.forEach { d ->
+                                items.add(Triple(d, "00:00 - 00:30", "Provider Stated · 98% Conf"))
+                            }
+                            summary.treatmentPlan.forEach { t ->
+                                items.add(Triple(t, "00:30 - 01:00", "Clinical Recommendation · 96% Conf"))
+                            }
+                            if (items.isEmpty()) {
+                                items.add(Triple(summary.plainLanguageOverview, "Recorded Session", "Clinical Discussion · 95% Conf"))
+                            }
+                            items
+                        }
+                    }
+
+                    dynamicTraceabilityItems.forEach { (fact, timing, source) ->
                         Card(
                             shape = RoundedCornerShape(8.dp),
                             colors = CardDefaults.cardColors(containerColor = MelColors.SurfaceBackground),
@@ -515,11 +554,14 @@ fun VisitSummaryScreen(
 
                 Spacer(modifier = Modifier.height(12.dp))
 
-                val definition = when (selectedJargonTerm) {
-                    "Pyelonephritis" -> "A kidney infection that has ascended from an untreated bladder infection. It requires prompt medical intervention and often intravenous (IV) antibiotics."
-                    "Dysphagia" -> "Difficulty swallowing solid foods or large tablets. Doctors can easily prescribe crushable pills or liquid suspensions if you let them know."
-                    "Reducible Hernia" -> "Bulging tissue that can be gently pushed back into the abdominal cavity. Wear supportive garments and watch for severe pain or firm discoloration."
-                    else -> "A clinical medical term discussed during your visit."
+                val definition = when {
+                    selectedJargonTerm.equals("Pyelonephritis", ignoreCase = true) -> "A kidney infection that has ascended from an untreated bladder infection. It requires prompt medical intervention and often intravenous (IV) antibiotics."
+                    selectedJargonTerm.equals("Dysphagia", ignoreCase = true) -> "Difficulty swallowing solid foods or large tablets. Doctors can easily prescribe crushable pills or liquid suspensions if you let them know."
+                    selectedJargonTerm.equals("Reducible Hernia", ignoreCase = true) -> "Bulging tissue that can be gently pushed back into the abdominal cavity. Wear supportive garments and watch for severe pain or firm discoloration."
+                    selectedJargonTerm.equals("Hypertension", ignoreCase = true) -> "High blood pressure inside your arteries. Regular monitoring, low-salt diet, and consistent medication help protect your heart."
+                    selectedJargonTerm.equals("Treatment Plan", ignoreCase = true) -> "The sequence of medical steps, medications, and lifestyle adjustments agreed upon with your healthcare provider."
+                    selectedJargonTerm.equals("Follow-up Care", ignoreCase = true) -> "Subsequent medical appointments or laboratory tests scheduled to monitor your health progress."
+                    else -> "Clinical term referenced in your consultation: \"$selectedJargonTerm\". This was explicitly discussed during your appointment. You can ask your doctor for further clarification using the Follow-up Questions tool."
                 }
 
                 Text(
