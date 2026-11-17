@@ -1,0 +1,19 @@
+services:
+  - type: web
+    name: mel-medical-backend
+    runtime: python
+    rootDir: backend
+    buildCommand: pip install -r requirements.txt
+    startCommand: uvicorn src.main:app --host 0.0.0.0 --port $PORT
+    envVars:
+      - key: PYTHON_VERSION
+        value: 3.12.0
+      - key: SUPABASE_URL
+        value: https://ptuqsmureupubeiafihy.supabase.co
+      - key: SUPABASE_ANON_KEY
+        value: eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InB0dXFzbXVyZXVwdWJlaWFmaWh5Iiwicm9sZSI6ImFub24iLCJpYXQiOjE3OTQ1NDQwMTUsImV4cCI6MjExMDEyMDAxNX0.HnPPwBsOnuxtXAR0q61tYX40WrqSXflPPp4TNffk8Rk
+      - key: OPENAI_API_KEY
+        sync: false
+      - key: OPENAI_MODEL
+        value: gpt-4o
+

@@ -1,0 +1,30 @@
+# Gradle & Android
+.gradle/
+.kotlin/
+build/
+**/build/
+*.apk
+*.aab
+local.properties
+.idea/
+*.iml
+.cxx/
+captures/
+
+# Python / FastAPI
+__pycache__/
+*.py[cod]
+*$py.class
+*.so
+.Python
+env/
+venv/
+.venv/
+.env
+*.log
+
+# OS & Editor
+.DS_Store
+Thumbs.db
+*.tmp
+*.swp
