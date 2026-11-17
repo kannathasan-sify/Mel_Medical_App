@@ -25,6 +25,8 @@ fun ConsultationTimelineScreen(
     visits: List<HistoricalVisitItem>,
     onVisitSelected: (String) -> Unit,
     onDeleteVisit: (String) -> Unit = {},
+    onStartNewConsultation: () -> Unit = {},
+    onUploadClicked: () -> Unit = {},
     onBackClicked: () -> Unit
 ) {
     var searchQuery by remember { mutableStateOf("") }
@@ -32,17 +34,17 @@ fun ConsultationTimelineScreen(
 
     val filterOptions = listOf(
         "All Visits",
-        "Urgent / ER",
-        "Outpatient",
-        "Cardiology"
+        "Consultations",
+        "Uploaded Records",
+        "Follow-ups"
     )
 
     val filteredVisits = visits.filter { visit ->
         val matchesCategory = when (selectedFilter) {
             "All Visits" -> true
-            "Urgent / ER" -> visit.visitType.contains("Urgent", ignoreCase = true) || visit.visitType.contains("Emergency", ignoreCase = true)
-            "Outpatient" -> visit.visitType.contains("Outpatient", ignoreCase = true)
-            "Cardiology" -> visit.visitType.contains("Cardiology", ignoreCase = true) || visit.providerName.contains("Cardiolog", ignoreCase = true)
+            "Consultations" -> visit.visitType.contains("Scribe", ignoreCase = true) || visit.visitType.contains("Consultation", ignoreCase = true)
+            "Uploaded Records" -> visit.visitType.contains("Upload", ignoreCase = true) || visit.visitType.contains("Document", ignoreCase = true)
+            "Follow-ups" -> visit.visitType.contains("Follow", ignoreCase = true)
             else -> true
         }
         val matchesSearch = searchQuery.isBlank() ||
@@ -95,7 +97,7 @@ fun ConsultationTimelineScreen(
                 value = searchQuery,
                 onValueChange = { searchQuery = it },
                 label = { Text("Search by doctor, diagnosis, or symptom...") },
-                placeholder = { Text("e.g. Pyelonephritis, Dr. Jenkins, Hernia...") },
+                placeholder = { Text("Search by doctor, clinic, diagnosis, or symptom...") },
                 modifier = Modifier.fillMaxWidth(),
                 shape = RoundedCornerShape(12.dp),
                 colors = OutlinedTextFieldDefaults.colors(
@@ -152,7 +154,7 @@ fun ConsultationTimelineScreen(
                         .padding(horizontal = 8.dp, vertical = 2.dp)
                 ) {
                     Text(
-                        text = "Auto-Synced",
+                        text = "Dynamic Records",
                         fontSize = 11.sp,
                         fontWeight = FontWeight.Bold,
                         color = MelColors.Apricot
@@ -162,7 +164,62 @@ fun ConsultationTimelineScreen(
 
             Spacer(modifier = Modifier.height(10.dp))
 
-            if (filteredVisits.isEmpty()) {
+            if (visits.isEmpty()) {
+                // Empty state when user hasn't recorded or uploaded any visits yet (Zero hardcoding)
+                Card(
+                    shape = RoundedCornerShape(16.dp),
+                    colors = CardDefaults.cardColors(containerColor = MelColors.CardSurface),
+                    border = BorderStroke(1.dp, MelColors.BorderSubtle),
+                    modifier = Modifier.fillMaxWidth().padding(top = 16.dp)
+                ) {
+                    Column(
+                        modifier = Modifier.padding(24.dp),
+                        horizontalAlignment = Alignment.CenterHorizontally
+                    ) {
+                        Box(
+                            modifier = Modifier
+                                .size(56.dp)
+                                .background(MelColors.ApricotLight, CircleShape),
+                            contentAlignment = Alignment.Center
+                        ) {
+                            Text("📋", fontSize = 26.sp)
+                        }
+                        Spacer(modifier = Modifier.height(12.dp))
+                        Text(
+                            text = "No Medical Visits Documented Yet",
+                            fontSize = 16.sp,
+                            fontWeight = FontWeight.Bold,
+                            color = MelColors.DeepBlue,
+                            textAlign = androidx.compose.ui.text.style.TextAlign.Center
+                        )
+                        Spacer(modifier = Modifier.height(6.dp))
+                        Text(
+                            text = "Your chronological health history will appear here dynamically as you record consultations with your doctor or upload visit documents.",
+                            fontSize = 12.sp,
+                            color = MelColors.TextSecondary,
+                            textAlign = androidx.compose.ui.text.style.TextAlign.Center,
+                            lineHeight = 17.sp
+                        )
+                        Spacer(modifier = Modifier.height(16.dp))
+                        Button(
+                            onClick = onStartNewConsultation,
+                            colors = ButtonDefaults.buttonColors(containerColor = MelColors.AquaGreen),
+                            shape = RoundedCornerShape(12.dp),
+                            modifier = Modifier.fillMaxWidth().height(46.dp)
+                        ) {
+                            Text("🎙️ Start Consultation Recording", fontWeight = FontWeight.Bold, fontSize = 13.sp)
+                        }
+                        Spacer(modifier = Modifier.height(8.dp))
+                        OutlinedButton(
+                            onClick = onUploadClicked,
+                            shape = RoundedCornerShape(12.dp),
+                            modifier = Modifier.fillMaxWidth().height(46.dp)
+                        ) {
+                            Text("📤 Upload Visit Notes / Photo", fontWeight = FontWeight.SemiBold, fontSize = 13.sp, color = MelColors.DeepBlue)
+                        }
+                    }
+                }
+            } else if (filteredVisits.isEmpty()) {
                 Card(
                     shape = RoundedCornerShape(14.dp),
                     colors = CardDefaults.cardColors(containerColor = MelColors.CardSurface),
@@ -183,7 +240,7 @@ fun ConsultationTimelineScreen(
                         )
                         Spacer(modifier = Modifier.height(4.dp))
                         Text(
-                            text = "Try adjusting your search filter or start a new consultation recording.",
+                            text = "No recorded visits match \"$searchQuery\". Try adjusting your search query or filter.",
                             fontSize = 12.sp,
                             color = MelColors.TextMuted,
                             textAlign = androidx.compose.ui.text.style.TextAlign.Center

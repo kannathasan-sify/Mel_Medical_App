@@ -1,11 +1,13 @@
 package com.mel.medicalapp.domain.usecase.history
 
-import com.mel.medicalapp.data.remote.dto.ConsultationDto
+import com.mel.medicalapp.core.security.SecureStorage
 import com.mel.medicalapp.data.repository.SupabasePatientRepository
-import com.mel.medicalapp.domain.model.Consultation
 import com.mel.medicalapp.domain.model.ConsultationStatus
-import kotlinx.coroutines.delay
+import kotlinx.serialization.Serializable
+import kotlinx.serialization.encodeToString
+import kotlinx.serialization.json.Json
 
+@Serializable
 data class HistoricalVisitItem(
     val id: String,
     val dateDisplay: String,
@@ -18,60 +20,40 @@ data class HistoricalVisitItem(
 )
 
 class PatientHistoryService(
-    private val repository: SupabasePatientRepository
+    private val repository: SupabasePatientRepository,
+    private val secureStorage: SecureStorage? = null
 ) {
+    private val json = Json { ignoreUnknownKeys = true; isLenient = true }
+    private val STORAGE_KEY = "patient_dynamic_visit_history"
+
     /**
-     * Retrieves the chronological timeline of medical visits.
-     * Incorporates both current encounters and historical appointments (e.g. Test Scenario 01 & 02).
+     * Retrieves the chronological timeline of actual medical visits.
+     * Contains only dynamic user-recorded consultations or documents (no hardcoded static visits).
      */
     suspend fun getPatientTimeline(patientId: String): List<HistoricalVisitItem> {
-        delay(600) // Simulates retrieval & sync from Supabase
+        val storedJson = secureStorage?.getString(STORAGE_KEY)
+        if (!storedJson.isNullOrBlank()) {
+            try {
+                return json.decodeFromString<List<HistoricalVisitItem>>(storedJson)
+            } catch (_: Exception) {}
+        }
+        // Starts completely empty until the patient records a visit or uploads documents
+        return emptyList()
+    }
 
-        return listOf(
-            HistoricalVisitItem(
-                id = "cons-001",
-                dateDisplay = "Today, 11:30 AM",
-                visitType = "Urgent Outpatient Evaluation",
-                providerName = "Dr. Sarah Jenkins, MD",
-                primaryFocus = "Untreated UTI, Flank Pain & Post-MVA Injuries",
-                status = ConsultationStatus.COMPLETED,
-                keyFindings = listOf(
-                    "Suspected ascending pyelonephritis",
-                    "Immediate ED referral for IV antibiotics",
-                    "Reducible post-accident umbilical hernia",
-                    "ENT referral for post-accident hearing changes"
-                ),
-                pendingQuestionsCount = 4
-            ),
-            HistoricalVisitItem(
-                id = "cons-000",
-                dateDisplay = "2 Weeks Ago",
-                visitType = "Emergency Department Visit",
-                providerName = "Memorial Hospital ER",
-                primaryFocus = "Initial UTI Diagnosis following rear-end collision",
-                status = ConsultationStatus.COMPLETED,
-                keyFindings = listOf(
-                    "Macrobid prescribed (untaken due to dysphagia)",
-                    "Minor neck strain documented",
-                    "No abdominal imaging performed at that time"
-                ),
-                pendingQuestionsCount = 2
-            ),
-            HistoricalVisitItem(
-                id = "cons-prior-1",
-                dateDisplay = "6 Months Ago",
-                visitType = "Cardiology & Chronic Care Follow-up",
-                providerName = "Dr. Robert Chen, Cardiologist",
-                primaryFocus = "Heart Palpitations, Lightheadedness & Diabetes",
-                status = ConsultationStatus.COMPLETED,
-                keyFindings = listOf(
-                    "Irregular heartbeat documented via EKG",
-                    "Sleep apnea study referral initiated",
-                    "Medication cost assistance programs discussed"
-                ),
-                pendingQuestionsCount = 1
-            )
-        )
+    suspend fun saveVisit(visit: HistoricalVisitItem) {
+        val currentVisits = getPatientTimeline("patient-id").toMutableList()
+        currentVisits.removeAll { it.id == visit.id }
+        currentVisits.add(0, visit) // Prepend newest visit
+        try {
+            secureStorage?.saveString(STORAGE_KEY, json.encodeToString(currentVisits))
+        } catch (_: Exception) {}
+    }
+
+    suspend fun deleteVisit(visitId: String) {
+        val currentVisits = getPatientTimeline("patient-id").filter { it.id != visitId }
+        try {
+            secureStorage?.saveString(STORAGE_KEY, json.encodeToString(currentVisits))
+        } catch (_: Exception) {}
     }
 }
-

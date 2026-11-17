@@ -117,3 +117,15 @@ class TranslationRequest(BaseModel):
 class TranslationResponse(BaseModel):
     target_language: str
     translations: List[TranslationItem]
+
+class ExplainTermRequest(BaseModel):
+    term: str
+
+class ExplainTermResponse(BaseModel):
+    term: str
+    pronunciation: str
+    plainMeaning: str
+    whyItMatters: str
+    doctorQuestions: List[str]
+    commonSymptomsOrUses: Optional[str] = None
+    category: str = "General Health"

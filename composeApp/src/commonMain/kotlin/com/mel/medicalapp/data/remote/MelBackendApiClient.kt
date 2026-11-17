@@ -76,4 +76,36 @@ class MelBackendApiClient(
             NetworkResult.Error(AppError.networkError("Failed to connect to MEL translation service: ${e.message}"))
         }
     }
+
+    /**
+     * Retrieves an AI-powered plain-language medical breakdown of any term, drug, or test.
+     */
+    suspend fun explainMedicalTerm(
+        term: String
+    ): NetworkResult<BackendExplainTermResponse> {
+        return try {
+            val request = BackendExplainTermRequest(term = term)
+            val response = try {
+                httpClient.post("$baseUrl/api/v1/consultations/explain-term") {
+                    contentType(ContentType.Application.Json)
+                    setBody(request)
+                }
+            } catch (e: Exception) {
+                httpClient.post("${AppConfig.BACKEND_URL_FALLBACK}/api/v1/consultations/explain-term") {
+                    contentType(ContentType.Application.Json)
+                    setBody(request)
+                }
+            }
+
+            if (response.status.isSuccess()) {
+                val data = response.body<BackendExplainTermResponse>()
+                NetworkResult.Success(data)
+            } else {
+                val err = response.bodyAsText()
+                NetworkResult.Error(AppError.serverError("Term lookup failed (${response.status}): $err"))
+            }
+        } catch (e: Exception) {
+            NetworkResult.Error(AppError.networkError("Failed to connect to MEL learning service: ${e.message}"))
+        }
+    }
 }

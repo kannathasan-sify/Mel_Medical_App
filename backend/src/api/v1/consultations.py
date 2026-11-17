@@ -18,7 +18,9 @@ from src.schemas.consultation import (
     DocumentExportResponse,
     TranslationRequest,
     TranslationResponse,
-    TranslationItem
+    TranslationItem,
+    ExplainTermRequest,
+    ExplainTermResponse
 )
 from src.services.ai.clinical_synthesizer import ClinicalIntelligenceService
 
@@ -300,6 +302,25 @@ async def translate_consultation_endpoint(request: TranslationRequest):
     return TranslationResponse(
         target_language=request.target_language,
         translations=items
+    )
+
+@router.post("/explain-term", response_model=ExplainTermResponse)
+async def explain_medical_term_endpoint(request: ExplainTermRequest):
+    """
+    Empowers patients with plain-language decoding and doctor questions for any medical term.
+    """
+    result = await ai_service.explain_medical_term(term=request.term)
+    return ExplainTermResponse(
+        term=result.get("term", request.term),
+        pronunciation=result.get("pronunciation", request.term.lower()),
+        plainMeaning=result.get("plainMeaning", f"Clinical concept relating to {request.term}."),
+        whyItMatters=result.get("whyItMatters", "Understanding this helps you participate actively in your medical decisions."),
+        doctorQuestions=result.get("doctorQuestions", [
+            f"What does {request.term} mean for my care plan?",
+            "Are there any specific symptoms I should watch for?"
+        ]),
+        commonSymptomsOrUses=result.get("commonSymptomsOrUses"),
+        category=result.get("category", "General Health")
     )
 
 

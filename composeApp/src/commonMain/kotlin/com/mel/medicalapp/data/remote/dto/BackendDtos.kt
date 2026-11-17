@@ -54,3 +54,19 @@ data class BackendTranslationResponse(
     val translations: List<BackendTranslationItem> = emptyList()
 )
 
+@Serializable
+data class BackendExplainTermRequest(
+    val term: String
+)
+
+@Serializable
+data class BackendExplainTermResponse(
+    val term: String,
+    val pronunciation: String = "",
+    val plainMeaning: String = "",
+    val whyItMatters: String = "",
+    val doctorQuestions: List<String> = emptyList(),
+    val commonSymptomsOrUses: String? = null,
+    val category: String = "General Health"
+)
+

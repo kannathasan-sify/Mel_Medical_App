@@ -43,7 +43,7 @@ fun App() {
     val supabaseRepo = remember { SupabasePatientRepository() }
     val speechEngine = remember { ClinicalSpeechToTextEngine(supabaseRepo) }
     val intelligenceEngine = remember { ClinicalIntelligenceEngine(supabaseRepo) }
-    val historyService = remember { PatientHistoryService(supabaseRepo) }
+    val historyService = remember { PatientHistoryService(supabaseRepo, secureStorage) }
     val audioRecorder = remember { createPlatformAudioRecorder() }
     val backendApiClient = remember { com.mel.medicalapp.data.remote.MelBackendApiClient() }
 
@@ -251,7 +251,16 @@ fun App() {
                     currentScreen = Screen.Summary
                 },
                 onDeleteVisit = { visitId ->
-                    historyVisits = historyVisits.filter { it.id != visitId }
+                    coroutineScope.launch {
+                        historyService.deleteVisit(visitId)
+                        historyVisits = historyService.getPatientTimeline(currentPatientId ?: "patient-id")
+                    }
+                },
+                onStartNewConsultation = {
+                    currentScreen = Screen.Scribe
+                },
+                onUploadClicked = {
+                    currentScreen = Screen.CaptureUpload
                 },
                 onBackClicked = {
                     currentScreen = Screen.Home
@@ -304,7 +313,8 @@ fun App() {
                                 keyFindings = summary.diagnosesExplicit.ifEmpty { listOf("Document decoded into plain English by MEL AI") },
                                 pendingQuestionsCount = questions.size
                             )
-                            historyVisits = listOf(newVisit) + historyVisits
+                            historyService.saveVisit(newVisit)
+                            historyVisits = historyService.getPatientTimeline(currentPatientId ?: "patient-id")
                             currentScreen = Screen.Summary
                         }
                     }
@@ -474,7 +484,8 @@ fun App() {
                                 keyFindings = summary.symptomsReported.take(3).ifEmpty { listOf("Consultation dialogue translated into plain English") },
                                 pendingQuestionsCount = questions.size
                             )
-                            historyVisits = listOf(newVisit) + historyVisits
+                            historyService.saveVisit(newVisit)
+                            historyVisits = historyService.getPatientTimeline(currentPatientId ?: "patient-id")
                             currentScreen = Screen.Summary
                         }
                     }

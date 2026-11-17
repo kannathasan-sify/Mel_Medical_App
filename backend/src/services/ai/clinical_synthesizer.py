@@ -195,4 +195,63 @@ Texts to translate:
             logger.error(f"Error during AI translation: {e}")
             return [{"original": t, "translated": f"[{target_language}] {t}"} for t in texts]
 
+    async def explain_medical_term(self, term: str) -> dict[str, Any]:
+        """
+        Generates a comprehensive, patient-friendly explanation of any medical term,
+        lab test, procedure, or drug using GPT-4o.
+        """
+        if not self.client:
+            return self._fallback_term_explanation(term)
+
+        try:
+            prompt = f"""You are MEL (Medical Empowerment Liaison), an expert clinical patient educator.
+Explain the medical term: "{term}" in clear, plain language suitable for a patient at an 8th-grade reading level.
+
+Return ONLY a valid JSON object matching this schema:
+{{
+  "term": "{term}",
+  "pronunciation": "phonetic guide (e.g. pie-low-nuh-FRY-tis)",
+  "plainMeaning": "2-3 clear sentences explaining what this is in everyday language without confusing medical jargon.",
+  "whyItMatters": "Why this test, condition, or medication is clinically significant for the patient's care.",
+  "doctorQuestions": [
+    "Question 1 to ask the doctor",
+    "Question 2 to ask the doctor",
+    "Question 3 to ask the doctor"
+  ],
+  "commonSymptomsOrUses": "Common symptoms associated or why this test/medication is prescribed.",
+  "category": "One of: Kidney & Bladder | Heart & Vessels | Medications & Rx | Imaging & Tests | General Health | Diagnostics"
+}}"""
+
+            completion = await self.client.chat.completions.create(
+                model=settings.OPENAI_MODEL,
+                messages=[
+                    {"role": "system", "content": "You are an expert clinical education assistant empowering patients with clear medical knowledge."},
+                    {"role": "user", "content": prompt}
+                ],
+                temperature=0.2,
+                response_format={"type": "json_object"}
+            )
+            raw = completion.choices[0].message.content or "{}"
+            parsed = json.loads(raw)
+            return parsed
+        except Exception as e:
+            logger.error(f"Error explaining term {term}: {e}")
+            return self._fallback_term_explanation(term)
+
+    def _fallback_term_explanation(self, term: str) -> dict[str, Any]:
+        return {
+            "term": term,
+            "pronunciation": term.lower(),
+            "plainMeaning": f"{term} is a clinical term referenced in medical diagnoses, laboratory testing, or healthcare treatment plans.",
+            "whyItMatters": "Understanding clinical terms helps you partner actively with your doctor, understand your treatment rationale, and avoid medication misunderstandings.",
+            "doctorQuestions": [
+                f"How does {term} specifically affect my daily health or symptoms?",
+                f"What are the next diagnostic or treatment steps regarding {term}?",
+                "Are there any specific lifestyle modifications or warning signs I should monitor?"
+            ],
+            "commonSymptomsOrUses": f"Related to diagnostic findings or management discussed during patient care.",
+            "category": "General Health"
+        }
+
+
 
