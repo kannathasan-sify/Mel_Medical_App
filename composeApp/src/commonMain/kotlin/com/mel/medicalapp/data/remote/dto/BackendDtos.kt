@@ -35,3 +35,22 @@ data class BackendVisitSummaryResponse(
     val emergency_notice: String? = null
 )
 
+@Serializable
+data class BackendTranslationRequest(
+    val consultation_id: String? = null,
+    val target_language: String = "Spanish",
+    val texts: List<String> = emptyList()
+)
+
+@Serializable
+data class BackendTranslationItem(
+    val original: String,
+    val translated: String
+)
+
+@Serializable
+data class BackendTranslationResponse(
+    val target_language: String,
+    val translations: List<BackendTranslationItem> = emptyList()
+)
+

@@ -3,8 +3,7 @@ package com.mel.medicalapp.data.remote
 import com.mel.medicalapp.core.config.AppConfig
 import com.mel.medicalapp.core.result.AppError
 import com.mel.medicalapp.core.result.NetworkResult
-import com.mel.medicalapp.data.remote.dto.BackendSynthesisRequest
-import com.mel.medicalapp.data.remote.dto.BackendVisitSummaryResponse
+import com.mel.medicalapp.data.remote.dto.*
 import io.ktor.client.*
 import io.ktor.client.call.*
 import io.ktor.client.request.*
@@ -28,7 +27,7 @@ class MelBackendApiClient(
                     setBody(request)
                 }
             } catch (e: Exception) {
-                // If 10.0.2.2 fails (e.g. running on desktop or iOS), try localhost fallback
+                // If cloud URL fails, try localhost fallback
                 httpClient.post("${AppConfig.BACKEND_URL_FALLBACK}/api/v1/consultations/synthesize") {
                     contentType(ContentType.Application.Json)
                     setBody(request)
@@ -46,5 +45,35 @@ class MelBackendApiClient(
             NetworkResult.Error(AppError.networkError("Failed to connect to MEL backend service: ${e.message}"))
         }
     }
-}
 
+    /**
+     * Translates spoken dialogue turns into a target language using AI.
+     */
+    suspend fun translateConsultation(
+        request: BackendTranslationRequest
+    ): NetworkResult<BackendTranslationResponse> {
+        return try {
+            val response = try {
+                httpClient.post("$baseUrl/api/v1/consultations/translate") {
+                    contentType(ContentType.Application.Json)
+                    setBody(request)
+                }
+            } catch (e: Exception) {
+                httpClient.post("${AppConfig.BACKEND_URL_FALLBACK}/api/v1/consultations/translate") {
+                    contentType(ContentType.Application.Json)
+                    setBody(request)
+                }
+            }
+
+            if (response.status.isSuccess()) {
+                val data = response.body<BackendTranslationResponse>()
+                NetworkResult.Success(data)
+            } else {
+                val err = response.bodyAsText()
+                NetworkResult.Error(AppError.serverError("Translation failed (${response.status}): $err"))
+            }
+        } catch (e: Exception) {
+            NetworkResult.Error(AppError.networkError("Failed to connect to MEL translation service: ${e.message}"))
+        }
+    }
+}

@@ -142,3 +142,57 @@ class ClinicalIntelligenceService:
             ]
         }
 
+    async def translate_texts(
+        self,
+        texts: list[str],
+        target_language: str = "Spanish"
+    ) -> list[dict[str, str]]:
+        """
+        Translates spoken dialogue turns or clinical texts into the target language using OpenAI GPT-4o.
+        """
+        if not texts:
+            return []
+
+        if not self.client:
+            return [
+                {"original": t, "translated": f"[{target_language}] {t}"}
+                for t in texts
+            ]
+
+        try:
+            prompt = f"""You are an expert medical translator. Translate each of the following spoken statements or clinical texts into {target_language}.
+Maintain medical precision, empathetic patient tone, and exact meaning.
+Return ONLY a valid JSON object with key "translations" matching:
+{{
+  "translations": [
+    {{"original": "original text", "translated": "translated text in {target_language}"}}
+  ]
+}}
+
+Texts to translate:
+{json.dumps(texts, ensure_ascii=False)}
+"""
+            completion = await self.client.chat.completions.create(
+                model=settings.OPENAI_MODEL,
+                messages=[
+                    {"role": "system", "content": f"You are a professional clinical translator specializing in {target_language}."},
+                    {"role": "user", "content": prompt}
+                ],
+                temperature=0.2,
+                response_format={"type": "json_object"}
+            )
+            raw = completion.choices[0].message.content or "{}"
+            parsed = json.loads(raw)
+            if isinstance(parsed, dict) and "translations" in parsed:
+                return parsed["translations"]
+            elif isinstance(parsed, list):
+                return parsed
+            for val in parsed.values():
+                if isinstance(val, list):
+                    return val
+            return [{"original": t, "translated": t} for t in texts]
+        except Exception as e:
+            logger.error(f"Error during AI translation: {e}")
+            return [{"original": t, "translated": f"[{target_language}] {t}"} for t in texts]
+
+

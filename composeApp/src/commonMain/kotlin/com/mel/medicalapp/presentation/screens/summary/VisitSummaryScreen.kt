@@ -444,6 +444,32 @@ fun VisitSummaryScreen(
                                         color = MelColors.TextPrimary,
                                         lineHeight = 17.sp
                                     )
+                                    if (!seg.translatedText.isNullOrBlank()) {
+                                        Spacer(modifier = Modifier.height(6.dp))
+                                        Box(
+                                            modifier = Modifier
+                                                .fillMaxWidth()
+                                                .background(Color.White.copy(alpha = 0.85f), RoundedCornerShape(6.dp))
+                                                .border(1.dp, MelColors.AquaGreen.copy(alpha = 0.4f), RoundedCornerShape(6.dp))
+                                                .padding(6.dp)
+                                        ) {
+                                            Column {
+                                                Text(
+                                                    text = "🌐 Translated (${seg.targetLanguage ?: "AI"}):",
+                                                    fontSize = 10.sp,
+                                                    fontWeight = FontWeight.Bold,
+                                                    color = MelColors.AquaGreen
+                                                )
+                                                Spacer(modifier = Modifier.height(2.dp))
+                                                Text(
+                                                    text = seg.translatedText,
+                                                    fontSize = 12.sp,
+                                                    color = MelColors.DeepBlue,
+                                                    lineHeight = 16.sp
+                                                )
+                                            }
+                                        }
+                                    }
                                 }
                             }
                         }

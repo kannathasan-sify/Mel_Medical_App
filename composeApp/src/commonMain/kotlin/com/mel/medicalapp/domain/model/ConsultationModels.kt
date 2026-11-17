@@ -32,7 +32,9 @@ data class TranscriptSegment(
     val speaker: SpeakerRole,
     val text: String,
     val confidence: Double,
-    val isUncertain: Boolean = false
+    val isUncertain: Boolean = false,
+    val translatedText: String? = null,
+    val targetLanguage: String? = null
 )
 
 enum class SpeakerRole {

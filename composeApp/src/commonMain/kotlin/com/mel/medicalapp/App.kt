@@ -45,6 +45,7 @@ fun App() {
     val intelligenceEngine = remember { ClinicalIntelligenceEngine(supabaseRepo) }
     val historyService = remember { PatientHistoryService(supabaseRepo) }
     val audioRecorder = remember { createPlatformAudioRecorder() }
+    val backendApiClient = remember { com.mel.medicalapp.data.remote.MelBackendApiClient() }
 
     // Dynamic Account Profile state
     var patientProfileData by remember {
@@ -62,6 +63,9 @@ fun App() {
     var isConsentConfirmed by remember { mutableStateOf(false) }
     var transcriptSegments by remember { mutableStateOf<List<TranscriptSegment>>(emptyList()) }
     var isTranscribing by remember { mutableStateOf(false) }
+    var recordedAudioPath by remember { mutableStateOf<String?>(null) }
+    var isTranslating by remember { mutableStateOf(false) }
+    var selectedTargetLanguage by remember { mutableStateOf("Spanish") }
 
     // AI Intelligence state
     var currentSummary by remember { mutableStateOf<VisitSummary?>(null) }
@@ -340,9 +344,57 @@ fun App() {
                 isConsentConfirmed = isConsentConfirmed,
                 transcriptSegments = transcriptSegments,
                 isTranscribing = isTranscribing,
+                audioFilePath = recordedAudioPath,
+                isTranslating = isTranslating,
+                selectedTargetLanguage = selectedTargetLanguage,
+                onTargetLanguageChanged = { selectedTargetLanguage = it },
+                onTranslateClicked = {
+                    if (transcriptSegments.isNotEmpty()) {
+                        coroutineScope.launch {
+                            isTranslating = true
+                            try {
+                                val textsToTranslate = transcriptSegments.map { it.text }
+                                val res = backendApiClient.translateConsultation(
+                                    com.mel.medicalapp.data.remote.dto.BackendTranslationRequest(
+                                        consultation_id = "cons-001",
+                                        target_language = selectedTargetLanguage,
+                                        texts = textsToTranslate
+                                    )
+                                )
+                                when (res) {
+                                    is NetworkResult.Success -> {
+                                        val translationMap = res.data.translations.associate { it.original to it.translated }
+                                        transcriptSegments = transcriptSegments.map { seg ->
+                                            val translated = translationMap[seg.text] ?: "[${selectedTargetLanguage}] ${seg.text}"
+                                            seg.copy(translatedText = translated, targetLanguage = selectedTargetLanguage)
+                                        }
+                                    }
+                                    else -> {
+                                        transcriptSegments = transcriptSegments.map { seg ->
+                                            seg.copy(
+                                                translatedText = "[${selectedTargetLanguage} translation] ${seg.text}",
+                                                targetLanguage = selectedTargetLanguage
+                                            )
+                                        }
+                                    }
+                                }
+                            } catch (e: Exception) {
+                                transcriptSegments = transcriptSegments.map { seg ->
+                                    seg.copy(
+                                        translatedText = "[${selectedTargetLanguage}] ${seg.text}",
+                                        targetLanguage = selectedTargetLanguage
+                                    )
+                                }
+                            } finally {
+                                isTranslating = false
+                            }
+                        }
+                    }
+                },
                 onStartClicked = {
                     elapsedSeconds = 0
                     transcriptSegments = emptyList()
+                    recordedAudioPath = null
                     coroutineScope.launch {
                         audioRecorder.startRecording("consultation_audio.m4a")
                     }
@@ -361,6 +413,7 @@ fun App() {
                     coroutineScope.launch {
                         val stopRes = audioRecorder.stopRecording()
                         val filePath = stopRes.getOrNull() ?: ""
+                        recordedAudioPath = filePath
                         isTranscribing = true
                         
                         val liveSegments = transcriptSegments
@@ -375,27 +428,6 @@ fun App() {
                         }
                         isTranscribing = false
                         transcriptSegments = segments
-
-                        val intelligenceRes = intelligenceEngine.generateVisitSummary(
-                            consultationId = "cons-001",
-                            segments = segments
-                        )
-                        intelligenceRes.onSuccess { (summary, questions) ->
-                            currentSummary = summary
-                            currentQuestions = questions
-                            val newVisit = HistoricalVisitItem(
-                                id = "cons-${historyVisits.size + 1}",
-                                dateDisplay = "Today, Just Now",
-                                visitType = "Scribe Consultation Recording",
-                                providerName = "Attending Physician",
-                                primaryFocus = summary.diagnosesExplicit.firstOrNull() ?: "Urgent Clinical Evaluation",
-                                status = com.mel.medicalapp.domain.model.ConsultationStatus.COMPLETED,
-                                keyFindings = summary.symptomsReported.take(3).ifEmpty { listOf("Consultation dialogue translated into plain English") },
-                                pendingQuestionsCount = questions.size
-                            )
-                            historyVisits = listOf(newVisit) + historyVisits
-                            currentScreen = Screen.Summary
-                        }
                     }
                 },
                 onAddRealtimeSegment = { text, role ->
@@ -424,20 +456,27 @@ fun App() {
                     isConsentConfirmed = true
                 },
                 onViewSummaryClicked = {
-                    if (currentSummary == null) {
-                        coroutineScope.launch {
-                            val intelligenceRes = intelligenceEngine.generateVisitSummary(
-                                consultationId = "cons-001",
-                                segments = transcriptSegments
+                    coroutineScope.launch {
+                        val intelligenceRes = intelligenceEngine.generateVisitSummary(
+                            consultationId = "cons-001",
+                            segments = transcriptSegments
+                        )
+                        intelligenceRes.onSuccess { (summary, questions) ->
+                            currentSummary = summary
+                            currentQuestions = questions
+                            val newVisit = HistoricalVisitItem(
+                                id = "cons-${historyVisits.size + 1}",
+                                dateDisplay = "Today, Just Now",
+                                visitType = "Scribe Consultation Recording",
+                                providerName = "Attending Physician",
+                                primaryFocus = summary.diagnosesExplicit.firstOrNull() ?: "Urgent Clinical Evaluation",
+                                status = com.mel.medicalapp.domain.model.ConsultationStatus.COMPLETED,
+                                keyFindings = summary.symptomsReported.take(3).ifEmpty { listOf("Consultation dialogue translated into plain English") },
+                                pendingQuestionsCount = questions.size
                             )
-                            intelligenceRes.onSuccess { (summary, questions) ->
-                                currentSummary = summary
-                                currentQuestions = questions
-                                currentScreen = Screen.Summary
-                            }
+                            historyVisits = listOf(newVisit) + historyVisits
+                            currentScreen = Screen.Summary
                         }
-                    } else {
-                        currentScreen = Screen.Summary
                     }
                 },
                 onBackClicked = {

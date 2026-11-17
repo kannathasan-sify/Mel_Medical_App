@@ -104,3 +104,16 @@ class DocumentExportResponse(BaseModel):
     format: str
     download_url: str
     generated_at: datetime
+
+class TranslationItem(BaseModel):
+    original: str
+    translated: str
+
+class TranslationRequest(BaseModel):
+    consultation_id: Optional[str] = None
+    target_language: str = "Spanish"
+    texts: List[str] = []
+
+class TranslationResponse(BaseModel):
+    target_language: str
+    translations: List[TranslationItem]

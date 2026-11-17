@@ -22,6 +22,7 @@ import androidx.compose.ui.unit.sp
 import com.mel.medicalapp.domain.model.SpeakerRole
 import com.mel.medicalapp.domain.model.TranscriptSegment
 import com.mel.medicalapp.platform.RecordingState
+import com.mel.medicalapp.platform.rememberPlatformAudioPlayer
 import com.mel.medicalapp.platform.rememberPlatformSpeechRecognizer
 import com.mel.medicalapp.presentation.components.AmbientRecordingHalo
 import com.mel.medicalapp.presentation.components.AudioWaveformVisualizer
@@ -37,6 +38,11 @@ fun ScribeRecordingScreen(
     isConsentConfirmed: Boolean,
     transcriptSegments: List<TranscriptSegment> = emptyList(),
     isTranscribing: Boolean = false,
+    audioFilePath: String? = null,
+    isTranslating: Boolean = false,
+    selectedTargetLanguage: String = "Spanish",
+    onTargetLanguageChanged: (String) -> Unit = {},
+    onTranslateClicked: () -> Unit = {},
     onStartClicked: () -> Unit,
     onPauseClicked: () -> Unit,
     onResumeClicked: () -> Unit,
@@ -52,6 +58,10 @@ fun ScribeRecordingScreen(
     var activeSpeaker by remember { mutableStateOf(SpeakerRole.PATIENT) }
     var manualInputText by remember { mutableStateOf("") }
     val speechRecognizer = rememberPlatformSpeechRecognizer()
+    val audioPlayer = rememberPlatformAudioPlayer()
+    val isAudioPlaying by audioPlayer.isPlaying.collectAsState()
+    val playbackPosition by audioPlayer.currentPositionSeconds.collectAsState()
+    val totalAudioDuration by audioPlayer.totalDurationSeconds.collectAsState()
 
     LaunchedEffect(recordingState, activeSpeaker) {
         if (recordingState == RecordingState.RECORDING) {
@@ -241,7 +251,150 @@ fun ScribeRecordingScreen(
                     }
                 }
 
-                Spacer(modifier = Modifier.height(12.dp))
+                Spacer(modifier = Modifier.height(10.dp))
+
+                // Recorded Audio Player Card (Allows user to play back what they spoke)
+                if (!audioFilePath.isNullOrBlank() || recordingState == RecordingState.STOPPED || recordingState == RecordingState.PAUSED) {
+                    Card(
+                        modifier = Modifier.fillMaxWidth(),
+                        shape = RoundedCornerShape(12.dp),
+                        colors = CardDefaults.cardColors(containerColor = MelColors.Ivory),
+                        border = BorderStroke(1.dp, MelColors.Apricot.copy(alpha = 0.8f))
+                    ) {
+                        Column(modifier = Modifier.padding(12.dp)) {
+                            Row(
+                                modifier = Modifier.fillMaxWidth(),
+                                verticalAlignment = Alignment.CenterVertically,
+                                horizontalArrangement = Arrangement.SpaceBetween
+                            ) {
+                                Row(verticalAlignment = Alignment.CenterVertically) {
+                                    IconButton(
+                                        onClick = {
+                                            if (isAudioPlaying) {
+                                                audioPlayer.pause()
+                                            } else {
+                                                audioFilePath?.let { audioPlayer.play(it) }
+                                            }
+                                        },
+                                        modifier = Modifier
+                                            .size(40.dp)
+                                            .background(MelColors.CoralPink, CircleShape)
+                                    ) {
+                                        Text(
+                                            text = if (isAudioPlaying) "⏸" else "▶",
+                                            color = Color.White,
+                                            fontSize = 16.sp,
+                                            fontWeight = FontWeight.Bold
+                                        )
+                                    }
+                                    Spacer(modifier = Modifier.width(10.dp))
+                                    Column {
+                                        Text(
+                                            text = if (isAudioPlaying) "Playing Spoken Audio..." else "Play Spoken Voice Recording",
+                                            fontWeight = FontWeight.Bold,
+                                            fontSize = 13.sp,
+                                            color = MelColors.DeepBlue
+                                        )
+                                        val posMin = playbackPosition / 60
+                                        val posSec = playbackPosition % 60
+                                        val durMin = totalAudioDuration / 60
+                                        val durSec = totalAudioDuration % 60
+                                        Text(
+                                            text = "${posMin.toString().padStart(2, '0')}:${posSec.toString().padStart(2, '0')} / ${durMin.toString().padStart(2, '0')}:${durSec.toString().padStart(2, '0')}",
+                                            fontSize = 11.sp,
+                                            color = MelColors.TextMuted
+                                        )
+                                    }
+                                }
+
+                                if (isAudioPlaying) {
+                                    OutlinedButton(
+                                        onClick = { audioPlayer.stop() },
+                                        shape = RoundedCornerShape(8.dp),
+                                        contentPadding = PaddingValues(horizontal = 8.dp, vertical = 2.dp)
+                                    ) {
+                                        Text("Stop", fontSize = 11.sp)
+                                    }
+                                }
+                            }
+
+                            Spacer(modifier = Modifier.height(8.dp))
+                            val progress = if (totalAudioDuration > 0) (playbackPosition.toFloat() / totalAudioDuration.toFloat()).coerceIn(0f, 1f) else 0f
+                            LinearProgressIndicator(
+                                progress = { progress },
+                                modifier = Modifier.fillMaxWidth().height(6.dp).clip(RoundedCornerShape(3.dp)),
+                                color = MelColors.CoralPink,
+                                trackColor = Color.White
+                            )
+                        }
+                    }
+
+                    Spacer(modifier = Modifier.height(8.dp))
+                }
+
+                // AI Spoken Dialogue Translation Controls
+                if (transcriptSegments.isNotEmpty()) {
+                    Card(
+                        modifier = Modifier.fillMaxWidth(),
+                        shape = RoundedCornerShape(12.dp),
+                        colors = CardDefaults.cardColors(containerColor = MelColors.CardSurface),
+                        border = BorderStroke(1.dp, MelColors.AquaGreen.copy(alpha = 0.5f))
+                    ) {
+                        Column(modifier = Modifier.padding(10.dp)) {
+                            Row(
+                                modifier = Modifier.fillMaxWidth(),
+                                horizontalArrangement = Arrangement.SpaceBetween,
+                                verticalAlignment = Alignment.CenterVertically
+                            ) {
+                                Row(verticalAlignment = Alignment.CenterVertically) {
+                                    Text("🌐", fontSize = 15.sp)
+                                    Spacer(modifier = Modifier.width(6.dp))
+                                    Text("AI Translation for Spoken Dialogue", fontWeight = FontWeight.Bold, fontSize = 12.sp, color = MelColors.DeepBlue)
+                                }
+                                if (isTranslating) {
+                                    Row(verticalAlignment = Alignment.CenterVertically) {
+                                        CircularProgressIndicator(modifier = Modifier.size(12.dp), strokeWidth = 2.dp, color = MelColors.AquaGreen)
+                                        Spacer(modifier = Modifier.width(4.dp))
+                                        Text("Translating...", fontSize = 10.sp, color = MelColors.AquaGreen)
+                                    }
+                                }
+                            }
+
+                            Spacer(modifier = Modifier.height(6.dp))
+                            val languages = listOf("Spanish", "Hindi", "Tamil", "French", "German")
+                            Row(
+                                modifier = Modifier.fillMaxWidth(),
+                                horizontalArrangement = Arrangement.spacedBy(6.dp)
+                            ) {
+                                languages.forEach { lang ->
+                                    FilterChip(
+                                        selected = selectedTargetLanguage.equals(lang, ignoreCase = true),
+                                        onClick = { onTargetLanguageChanged(lang) },
+                                        label = { Text(lang, fontSize = 10.sp, fontWeight = FontWeight.Medium) },
+                                        colors = FilterChipDefaults.filterChipColors(
+                                            selectedContainerColor = MelColors.AquaGreen.copy(alpha = 0.2f),
+                                            selectedLabelColor = MelColors.DeepBlue
+                                        ),
+                                        modifier = Modifier.weight(1f)
+                                    )
+                                }
+                            }
+
+                            Spacer(modifier = Modifier.height(6.dp))
+                            Button(
+                                onClick = onTranslateClicked,
+                                enabled = !isTranslating && transcriptSegments.isNotEmpty(),
+                                colors = ButtonDefaults.buttonColors(containerColor = MelColors.AquaGreen),
+                                shape = RoundedCornerShape(8.dp),
+                                modifier = Modifier.fillMaxWidth().height(38.dp)
+                            ) {
+                                Text("🌐 Translate Spoken Words with AI ($selectedTargetLanguage)", fontSize = 11.sp, fontWeight = FontWeight.Bold)
+                            }
+                        }
+                    }
+
+                    Spacer(modifier = Modifier.height(8.dp))
+                }
 
                 // Diarized Live Transcript Section Header
                 Row(
@@ -603,6 +756,39 @@ private fun ClinicalTranscriptCard(segment: TranscriptSegment) {
                 lineHeight = 19.sp,
                 fontStyle = if (isPatient) androidx.compose.ui.text.font.FontStyle.Italic else androidx.compose.ui.text.font.FontStyle.Normal
             )
+
+            // AI Translated Text Card
+            if (!segment.translatedText.isNullOrBlank()) {
+                Spacer(modifier = Modifier.height(8.dp))
+                Box(
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .background(Color.White.copy(alpha = 0.85f), RoundedCornerShape(8.dp))
+                        .border(1.dp, MelColors.AquaGreen.copy(alpha = 0.5f), RoundedCornerShape(8.dp))
+                        .padding(10.dp)
+                ) {
+                    Column {
+                        Row(verticalAlignment = Alignment.CenterVertically) {
+                            Text("🌐", fontSize = 12.sp)
+                            Spacer(modifier = Modifier.width(4.dp))
+                            Text(
+                                text = "Translated into ${segment.targetLanguage ?: "Target Language"}",
+                                fontSize = 11.sp,
+                                fontWeight = FontWeight.Bold,
+                                color = MelColors.AquaGreen
+                            )
+                        }
+                        Spacer(modifier = Modifier.height(4.dp))
+                        Text(
+                            text = segment.translatedText,
+                            fontSize = 13.sp,
+                            color = MelColors.DeepBlue,
+                            fontWeight = FontWeight.Medium,
+                            lineHeight = 18.sp
+                        )
+                    }
+                }
+            }
         }
     }
 }

@@ -15,7 +15,10 @@ from src.schemas.consultation import (
     ShareConsultationRequest,
     ShareConsultationResponse,
     DocumentExportRequest,
-    DocumentExportResponse
+    DocumentExportResponse,
+    TranslationRequest,
+    TranslationResponse,
+    TranslationItem
 )
 from src.services.ai.clinical_synthesizer import ClinicalIntelligenceService
 
@@ -273,4 +276,30 @@ async def transcribe_audio_endpoint(file: UploadFile = File(...)):
         return {"text": transcription.text, "status": "success"}
     except Exception as e:
         return {"text": "", "status": "error", "error": str(e)}
+
+@router.post("/translate", response_model=TranslationResponse)
+async def translate_consultation_endpoint(request: TranslationRequest):
+    """
+    Translates spoken consultation dialogue turns into a target language using AI.
+    """
+    if not request.texts:
+        return TranslationResponse(target_language=request.target_language, translations=[])
+
+    raw_translations = await ai_service.translate_texts(
+        texts=request.texts,
+        target_language=request.target_language
+    )
+
+    items = [
+        TranslationItem(
+            original=t.get("original", ""),
+            translated=t.get("translated", "")
+        ) for t in raw_translations
+    ]
+
+    return TranslationResponse(
+        target_language=request.target_language,
+        translations=items
+    )
+
 
