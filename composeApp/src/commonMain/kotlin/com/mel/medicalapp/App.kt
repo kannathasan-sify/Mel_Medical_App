@@ -67,6 +67,8 @@ fun App() {
     var isTranslating by remember { mutableStateOf(false) }
     var isGeneratingSummary by remember { mutableStateOf(false) }
     var scribeErrorMessage by remember { mutableStateOf<String?>(null) }
+    var isProcessingDocument by remember { mutableStateOf(false) }
+    var captureUploadErrorMessage by remember { mutableStateOf<String?>(null) }
     var selectedTargetLanguage by remember { mutableStateOf("Spanish") }
 
     // AI Intelligence state
@@ -281,43 +283,64 @@ fun App() {
         }
         is Screen.CaptureUpload -> {
             CaptureUploadScreen(
-                onBackClicked = { currentScreen = Screen.Home },
+                isProcessing = isProcessingDocument,
+                errorMessage = captureUploadErrorMessage,
+                onDismissError = { captureUploadErrorMessage = null },
+                onBackClicked = {
+                    captureUploadErrorMessage = null
+                    currentScreen = Screen.Home
+                },
                 onDocumentProcessed = { docName, docContent ->
+                    captureUploadErrorMessage = null
+                    isProcessingDocument = true
                     coroutineScope.launch {
-                        val pseudoSegments = listOf(
-                            TranscriptSegment(
-                                id = "doc-seg-1",
-                                consultationId = "doc-001",
-                                sequenceOrder = 1,
-                                startTimeMs = 0,
-                                endTimeMs = 15000,
-                                speaker = SpeakerRole.PROVIDER,
-                                text = docContent,
-                                confidence = 0.98,
-                                isUncertain = false
+                        try {
+                            val pseudoSegments = listOf(
+                                TranscriptSegment(
+                                    id = "doc-seg-1",
+                                    consultationId = "doc-${System.currentTimeMillis()}",
+                                    sequenceOrder = 1,
+                                    startTimeMs = 0,
+                                    endTimeMs = 15000,
+                                    speaker = SpeakerRole.PROVIDER,
+                                    text = docContent,
+                                    confidence = 0.98,
+                                    isUncertain = false
+                                )
                             )
-                        )
-                        transcriptSegments = pseudoSegments
-                        val res = intelligenceEngine.generateVisitSummary(
-                            consultationId = "doc-analysis",
-                            segments = pseudoSegments
-                        )
-                        res.onSuccess { (summary, questions) ->
-                            currentSummary = summary
-                            currentQuestions = questions
-                            val newVisit = HistoricalVisitItem(
-                                id = "doc-${historyVisits.size + 1}",
-                                dateDisplay = "Today, Just Now",
-                                visitType = "Document Upload / Lab Panel",
-                                providerName = "Diagnostic Lab / Imaging Center",
-                                primaryFocus = docName.replace(".pdf", "").replace("_", " "),
-                                status = com.mel.medicalapp.domain.model.ConsultationStatus.COMPLETED,
-                                keyFindings = summary.diagnosesExplicit.ifEmpty { listOf("Document decoded into plain English by MEL AI") },
-                                pendingQuestionsCount = questions.size
+                            transcriptSegments = pseudoSegments
+                            val res = intelligenceEngine.generateVisitSummary(
+                                consultationId = "doc-${System.currentTimeMillis()}",
+                                segments = pseudoSegments,
+                                readingLevel = patientProfileData.summaryDetailLevel
                             )
-                            historyService.saveVisit(newVisit)
-                            historyVisits = historyService.getPatientTimeline(currentPatientId ?: "patient-id")
-                            currentScreen = Screen.Summary
+                            res.onSuccess { (summary, questions) ->
+                                currentSummary = summary
+                                currentQuestions = questions
+                                val newVisit = HistoricalVisitItem(
+                                    id = "doc-${historyVisits.size + 1}",
+                                    dateDisplay = "Today, Just Now",
+                                    visitType = "Document Upload / Lab Panel",
+                                    providerName = "Diagnostic Lab / Imaging Center",
+                                    primaryFocus = docName.replace(".pdf", "").replace("_", " "),
+                                    status = com.mel.medicalapp.domain.model.ConsultationStatus.COMPLETED,
+                                    keyFindings = summary.diagnosesExplicit.ifEmpty { listOf("Document decoded into plain English by MEL AI") },
+                                    pendingQuestionsCount = questions.size
+                                )
+                                historyService.saveVisit(newVisit)
+                                historyVisits = historyService.getPatientTimeline(currentPatientId ?: "patient-id")
+                                currentScreen = Screen.Summary
+                            }.onFailure { err ->
+                                val msg = err.message ?: "Failed to analyze clinical document."
+                                println("MEL_DOC_ANALYSIS_ERROR: $msg")
+                                captureUploadErrorMessage = msg
+                            }
+                        } catch (e: Exception) {
+                            val msg = e.message ?: "Document analysis failed."
+                            println("MEL_DOC_ANALYSIS_EXCEPTION: $msg")
+                            captureUploadErrorMessage = msg
+                        } finally {
+                            isProcessingDocument = false
                         }
                     }
                 }

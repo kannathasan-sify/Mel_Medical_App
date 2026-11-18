@@ -27,9 +27,11 @@ data class ClinicalDocumentSample(
 @Composable
 fun CaptureUploadScreen(
     onBackClicked: () -> Unit,
-    onDocumentProcessed: (fileName: String, content: String) -> Unit
+    onDocumentProcessed: (fileName: String, content: String) -> Unit,
+    isProcessing: Boolean = false,
+    errorMessage: String? = null,
+    onDismissError: () -> Unit = {}
 ) {
-    var isProcessing by remember { mutableStateOf(false) }
     var selectedDocName by remember { mutableStateOf<String?>(null) }
     var selectedDocContent by remember { mutableStateOf("") }
 
@@ -113,6 +115,42 @@ fun CaptureUploadScreen(
                 .verticalScroll(rememberScrollState()),
             verticalArrangement = Arrangement.spacedBy(16.dp)
         ) {
+            // Error Banner (if any)
+            if (errorMessage != null) {
+                Card(
+                    modifier = Modifier.fillMaxWidth(),
+                    shape = RoundedCornerShape(12.dp),
+                    colors = CardDefaults.cardColors(containerColor = MelColors.CoralLight),
+                    border = BorderStroke(1.5.dp, MelColors.CoralPink)
+                ) {
+                    Row(
+                        modifier = Modifier.padding(14.dp),
+                        verticalAlignment = Alignment.CenterVertically
+                    ) {
+                        Text("⚠️", fontSize = 22.sp)
+                        Spacer(modifier = Modifier.width(10.dp))
+                        Column(modifier = Modifier.weight(1f)) {
+                            Text(
+                                "Document Translation Issue",
+                                fontWeight = FontWeight.Bold,
+                                fontSize = 13.sp,
+                                color = MelColors.CoralPink
+                            )
+                            Spacer(modifier = Modifier.height(2.dp))
+                            Text(
+                                errorMessage,
+                                fontSize = 12.sp,
+                                color = MelColors.TextPrimary,
+                                lineHeight = 16.sp
+                            )
+                        }
+                        IconButton(onClick = onDismissError) {
+                            Text("✕", fontWeight = FontWeight.Bold, color = MelColors.CoralPink)
+                        }
+                    }
+                }
+            }
+
             // Explanatory Banner
             Card(
                 shape = RoundedCornerShape(14.dp),
@@ -369,8 +407,7 @@ fun CaptureUploadScreen(
             // Action Button
             Button(
                 onClick = {
-                    if (selectedDocName != null) {
-                        isProcessing = true
+                    if (selectedDocName != null && !isProcessing) {
                         onDocumentProcessed(selectedDocName!!, selectedDocContent)
                     }
                 },
@@ -384,7 +421,7 @@ fun CaptureUploadScreen(
                 if (isProcessing) {
                     CircularProgressIndicator(modifier = Modifier.size(24.dp), color = Color.White, strokeWidth = 2.dp)
                     Spacer(modifier = Modifier.width(10.dp))
-                    Text("Translating & Analyzing Document...", fontWeight = FontWeight.Bold)
+                    Text("Translating & Analyzing Document...", fontWeight = FontWeight.Bold, fontSize = 14.sp)
                 } else {
                     Row(verticalAlignment = Alignment.CenterVertically) {
                         Text("Translate & Analyze Findings 🚀", fontSize = 15.sp, fontWeight = FontWeight.Bold)

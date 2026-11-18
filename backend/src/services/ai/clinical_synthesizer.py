@@ -84,6 +84,7 @@ class ClinicalIntelligenceService:
                     {"role": "user", "content": f"Transcript:\n{transcript_text}"}
                 ],
                 temperature=0.2,
+                max_tokens=1500,
                 response_format={"type": "json_object"}
             )
             raw_json = response.choices[0].message.content

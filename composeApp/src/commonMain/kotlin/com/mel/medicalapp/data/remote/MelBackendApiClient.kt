@@ -22,17 +22,9 @@ class MelBackendApiClient(
         request: BackendSynthesisRequest
     ): NetworkResult<BackendVisitSummaryResponse> {
         return try {
-            val response = try {
-                httpClient.post("$baseUrl/api/v1/consultations/synthesize") {
-                    contentType(ContentType.Application.Json)
-                    setBody(request)
-                }
-            } catch (e: Exception) {
-                // If cloud URL fails, try localhost fallback
-                httpClient.post("${AppConfig.BACKEND_URL_FALLBACK}/api/v1/consultations/synthesize") {
-                    contentType(ContentType.Application.Json)
-                    setBody(request)
-                }
+            val response = httpClient.post("$baseUrl/api/v1/consultations/synthesize") {
+                contentType(ContentType.Application.Json)
+                setBody(request)
             }
 
             if (response.status.isSuccess()) {
@@ -43,7 +35,13 @@ class MelBackendApiClient(
                 NetworkResult.Error(AppError.serverError("Backend synthesis failed (${response.status}): $err"))
             }
         } catch (e: Exception) {
-            NetworkResult.Error(AppError.networkError("Failed to connect to MEL backend service: ${e.message}"))
+            val msg = e.message ?: "Unknown error"
+            val friendly = if (msg.contains("timeout", ignoreCase = true)) {
+                "Connection timed out contacting Clinical AI backend. The cloud server may have been waking up. Please try again."
+            } else {
+                "Failed to connect to MEL backend service: $msg"
+            }
+            NetworkResult.Error(AppError.networkError(friendly))
         }
     }
 
@@ -54,16 +52,9 @@ class MelBackendApiClient(
         request: BackendTranslationRequest
     ): NetworkResult<BackendTranslationResponse> {
         return try {
-            val response = try {
-                httpClient.post("$baseUrl/api/v1/consultations/translate") {
-                    contentType(ContentType.Application.Json)
-                    setBody(request)
-                }
-            } catch (e: Exception) {
-                httpClient.post("${AppConfig.BACKEND_URL_FALLBACK}/api/v1/consultations/translate") {
-                    contentType(ContentType.Application.Json)
-                    setBody(request)
-                }
+            val response = httpClient.post("$baseUrl/api/v1/consultations/translate") {
+                contentType(ContentType.Application.Json)
+                setBody(request)
             }
 
             if (response.status.isSuccess()) {
@@ -86,16 +77,9 @@ class MelBackendApiClient(
     ): NetworkResult<BackendExplainTermResponse> {
         return try {
             val request = BackendExplainTermRequest(term = term)
-            val response = try {
-                httpClient.post("$baseUrl/api/v1/consultations/explain-term") {
-                    contentType(ContentType.Application.Json)
-                    setBody(request)
-                }
-            } catch (e: Exception) {
-                httpClient.post("${AppConfig.BACKEND_URL_FALLBACK}/api/v1/consultations/explain-term") {
-                    contentType(ContentType.Application.Json)
-                    setBody(request)
-                }
+            val response = httpClient.post("$baseUrl/api/v1/consultations/explain-term") {
+                contentType(ContentType.Application.Json)
+                setBody(request)
             }
 
             if (response.status.isSuccess()) {
@@ -164,11 +148,7 @@ class MelBackendApiClient(
         patientId: String
     ): NetworkResult<List<BackendConsultationItem>> {
         return try {
-            val response = try {
-                httpClient.get("$baseUrl/api/v1/consultations/patient/$patientId")
-            } catch (e: Exception) {
-                httpClient.get("${AppConfig.BACKEND_URL_FALLBACK}/api/v1/consultations/patient/$patientId")
-            }
+            val response = httpClient.get("$baseUrl/api/v1/consultations/patient/$patientId")
 
             if (response.status.isSuccess()) {
                 val data = response.body<BackendPatientConsultationsResponse>()
@@ -189,11 +169,7 @@ class MelBackendApiClient(
         consultationId: String
     ): NetworkResult<Boolean> {
         return try {
-            val response = try {
-                httpClient.delete("$baseUrl/api/v1/consultations/$consultationId")
-            } catch (e: Exception) {
-                httpClient.delete("${AppConfig.BACKEND_URL_FALLBACK}/api/v1/consultations/$consultationId")
-            }
+            val response = httpClient.delete("$baseUrl/api/v1/consultations/$consultationId")
 
             if (response.status.isSuccess()) {
                 NetworkResult.Success(true)
