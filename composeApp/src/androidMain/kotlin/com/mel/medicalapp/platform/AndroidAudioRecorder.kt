@@ -47,7 +47,8 @@ class AndroidAudioRecorder(
                 }
 
                 recorder.apply {
-                    setAudioSource(MediaRecorder.AudioSource.MIC)
+                    // Use VOICE_RECOGNITION audio source so Android AudioPolicy allows concurrent capture with SpeechRecognizer
+                    setAudioSource(MediaRecorder.AudioSource.VOICE_RECOGNITION)
                     setOutputFormat(MediaRecorder.OutputFormat.MPEG_4)
                     setAudioEncoder(MediaRecorder.AudioEncoder.AAC)
                     try {

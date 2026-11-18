@@ -500,7 +500,7 @@ fun ScribeRecordingScreen(
                             Text("🎙️", fontSize = 36.sp)
                             Spacer(modifier = Modifier.height(10.dp))
                             Text(
-                                text = if (recordingState == RecordingState.RECORDING) "Listening to Microphone..." else "Ready to Record Visit",
+                                text = if (recordingState == RecordingState.RECORDING) "Listening to Microphone..." else if (recordingState == RecordingState.STOPPED) "Consultation Finished" else "Ready to Record Visit",
                                 fontWeight = FontWeight.Bold,
                                 fontSize = 14.sp,
                                 color = MelColors.DeepBlue
@@ -509,6 +509,8 @@ fun ScribeRecordingScreen(
                             Text(
                                 text = if (recordingState == RecordingState.RECORDING)
                                     "Speak near the phone. Words spoken by you or your doctor will transcribe live right here."
+                                else if (recordingState == RecordingState.STOPPED)
+                                    "Tap a common symptom below or type above if microphone was quiet:"
                                 else
                                     "Tap 'Start Consultation Recording' when you are ready to begin.",
                                 fontSize = 12.sp,
@@ -516,6 +518,52 @@ fun ScribeRecordingScreen(
                                 textAlign = androidx.compose.ui.text.style.TextAlign.Center,
                                 lineHeight = 16.sp
                             )
+                            if (recordingState == RecordingState.STOPPED) {
+                                Spacer(modifier = Modifier.height(12.dp))
+                                Row(
+                                    modifier = Modifier.fillMaxWidth(),
+                                    horizontalArrangement = Arrangement.spacedBy(8.dp)
+                                ) {
+                                    Button(
+                                        onClick = { onAddRealtimeSegment("I have a fever, chills, and body aches.", SpeakerRole.PATIENT) },
+                                        shape = RoundedCornerShape(10.dp),
+                                        colors = ButtonDefaults.buttonColors(containerColor = MelColors.Apricot.copy(alpha = 0.35f)),
+                                        modifier = Modifier.weight(1f)
+                                    ) {
+                                        Text("🌡️ I have fever", fontSize = 11.sp, color = MelColors.DeepBlue, fontWeight = FontWeight.Bold)
+                                    }
+                                    Button(
+                                        onClick = { onAddRealtimeSegment("I have a persistent cough and sore throat.", SpeakerRole.PATIENT) },
+                                        shape = RoundedCornerShape(10.dp),
+                                        colors = ButtonDefaults.buttonColors(containerColor = MelColors.SkyBlue.copy(alpha = 0.25f)),
+                                        modifier = Modifier.weight(1f)
+                                    ) {
+                                        Text("🤧 Cough & Cold", fontSize = 11.sp, color = MelColors.DeepBlue, fontWeight = FontWeight.Bold)
+                                    }
+                                }
+                                Spacer(modifier = Modifier.height(6.dp))
+                                Row(
+                                    modifier = Modifier.fillMaxWidth(),
+                                    horizontalArrangement = Arrangement.spacedBy(8.dp)
+                                ) {
+                                    Button(
+                                        onClick = { onAddRealtimeSegment("I have a severe headache and throbbing migraine.", SpeakerRole.PATIENT) },
+                                        shape = RoundedCornerShape(10.dp),
+                                        colors = ButtonDefaults.buttonColors(containerColor = MelColors.CoralPink.copy(alpha = 0.25f)),
+                                        modifier = Modifier.weight(1f)
+                                    ) {
+                                        Text("🤕 Headache", fontSize = 11.sp, color = MelColors.DeepBlue, fontWeight = FontWeight.Bold)
+                                    }
+                                    Button(
+                                        onClick = { onAddRealtimeSegment("I have stomach pain and nausea since yesterday.", SpeakerRole.PATIENT) },
+                                        shape = RoundedCornerShape(10.dp),
+                                        colors = ButtonDefaults.buttonColors(containerColor = MelColors.AquaGreen.copy(alpha = 0.25f)),
+                                        modifier = Modifier.weight(1f)
+                                    ) {
+                                        Text("🤢 Stomach Pain", fontSize = 11.sp, color = MelColors.DeepBlue, fontWeight = FontWeight.Bold)
+                                    }
+                                }
+                            }
                         }
                     }
                 } else {

@@ -267,11 +267,12 @@ async def transcribe_audio_endpoint(file: UploadFile = File(...)):
     """
     Transcribes actual recorded audio using OpenAI Whisper (whisper-1).
     """
-    if not ai_service.client:
-        return {"text": "", "status": "no_client"}
+    client = ai_service.get_client()
+    if not client:
+        return {"text": "", "status": "no_client", "error": "OPENAI_API_KEY environment variable is not configured on server"}
     try:
         content = await file.read()
-        transcription = await ai_service.client.audio.transcriptions.create(
+        transcription = await client.audio.transcriptions.create(
             model="whisper-1",
             file=(file.filename or "recording.m4a", content, file.content_type or "audio/m4a")
         )

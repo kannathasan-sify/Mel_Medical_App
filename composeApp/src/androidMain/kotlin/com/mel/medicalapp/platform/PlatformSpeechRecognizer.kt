@@ -38,7 +38,9 @@ actual class PlatformSpeechRecognizer(
                 }
 
                 recognizer?.setRecognitionListener(object : RecognitionListener {
-                    override fun onReadyForSpeech(params: Bundle?) {}
+                    override fun onReadyForSpeech(params: Bundle?) {
+                        android.util.Log.d("SpeechRecognizer", "Ready for speech")
+                    }
                     override fun onBeginningOfSpeech() {}
                     override fun onRmsChanged(rmsdB: Float) {
                         val normalized = ((rmsdB + 2f) / 12f).coerceIn(0f, 1f)
@@ -48,10 +50,14 @@ actual class PlatformSpeechRecognizer(
                     override fun onEndOfSpeech() {}
                     override fun onError(error: Int) {
                         android.util.Log.d("SpeechRecognizer", "Recognizer status code: $error")
+                        try {
+                            recognizer?.cancel()
+                        } catch (_: Exception) {}
                         if (isRecordingActive) {
+                            val delayMs = if (error == SpeechRecognizer.ERROR_RECOGNIZER_BUSY || error == SpeechRecognizer.ERROR_CLIENT) 800L else 400L
                             uiHandler.postDelayed({
                                 if (isRecordingActive) restartRecognizer()
-                            }, 600)
+                            }, delayMs)
                         }
                     }
                     override fun onResults(results: Bundle?) {
@@ -64,10 +70,17 @@ actual class PlatformSpeechRecognizer(
                         if (isRecordingActive) {
                             uiHandler.postDelayed({
                                 if (isRecordingActive) restartRecognizer()
-                            }, 300)
+                            }, 250)
                         }
                     }
-                    override fun onPartialResults(partialResults: Bundle?) {}
+                    override fun onPartialResults(partialResults: Bundle?) {
+                        val matches = partialResults?.getStringArrayList(SpeechRecognizer.RESULTS_RECOGNITION)
+                        val text = matches?.firstOrNull()?.trim()
+                        if (!text.isNullOrBlank()) {
+                            android.util.Log.i("SpeechRecognizer", "Partial speech recognized: $text")
+                            onSpeechResult?.invoke(text)
+                        }
+                    }
                     override fun onEvent(eventType: Int, params: Bundle?) {}
                 })
 
@@ -79,15 +92,20 @@ actual class PlatformSpeechRecognizer(
     }
 
     private fun restartRecognizer() {
+        if (!isRecordingActive) return
         try {
+            recognizer?.cancel()
             val intent = Intent(RecognizerIntent.ACTION_RECOGNIZE_SPEECH).apply {
                 putExtra(RecognizerIntent.EXTRA_LANGUAGE_MODEL, RecognizerIntent.LANGUAGE_MODEL_FREE_FORM)
-                putExtra(RecognizerIntent.EXTRA_LANGUAGE, Locale.getDefault())
-                putExtra(RecognizerIntent.EXTRA_PARTIAL_RESULTS, false)
-                putExtra(RecognizerIntent.EXTRA_MAX_RESULTS, 1)
+                putExtra(RecognizerIntent.EXTRA_LANGUAGE, Locale.getDefault().toLanguageTag())
+                putExtra(RecognizerIntent.EXTRA_PARTIAL_RESULTS, true)
+                putExtra(RecognizerIntent.EXTRA_MAX_RESULTS, 3)
+                putExtra("android.speech.extra.DICTATION_MODE", true)
             }
             recognizer?.startListening(intent)
-        } catch (_: Exception) {}
+        } catch (e: Exception) {
+            android.util.Log.e("SpeechRecognizer", "restartRecognizer error: ${e.message}")
+        }
     }
 
     actual fun stopListening() {
@@ -104,6 +122,7 @@ actual class PlatformSpeechRecognizer(
         isRecordingActive = false
         uiHandler.post {
             try {
+                recognizer?.cancel()
                 recognizer?.destroy()
                 recognizer = null
             } catch (_: Exception) {}
@@ -122,4 +141,3 @@ actual fun rememberPlatformSpeechRecognizer(): PlatformSpeechRecognizer {
     }
     return instance
 }
-
