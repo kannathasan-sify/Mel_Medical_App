@@ -266,10 +266,14 @@ async def synthesize_consultation_endpoint(request: SynthesisRequest):
 async def transcribe_audio_endpoint(file: UploadFile = File(...)):
     """
     Transcribes actual recorded audio using OpenAI Whisper (whisper-1).
+    Raises real HTTP errors if unconfigured or failed.
     """
     client = ai_service.get_client()
     if not client:
-        return {"text": "", "status": "no_client", "error": "OPENAI_API_KEY environment variable is not configured on server"}
+        raise HTTPException(
+            status_code=503,
+            detail="OpenAI Whisper API is not configured on the backend server. Please set OPENAI_API_KEY in Render environment settings."
+        )
     try:
         content = await file.read()
         transcription = await client.audio.transcriptions.create(
@@ -278,7 +282,10 @@ async def transcribe_audio_endpoint(file: UploadFile = File(...)):
         )
         return {"text": transcription.text, "status": "success"}
     except Exception as e:
-        return {"text": "", "status": "error", "error": str(e)}
+        raise HTTPException(
+            status_code=502,
+            detail=f"OpenAI Whisper transcription failed: {str(e)}"
+        )
 
 @router.post("/translate", response_model=TranslationResponse)
 async def translate_consultation_endpoint(request: TranslationRequest):

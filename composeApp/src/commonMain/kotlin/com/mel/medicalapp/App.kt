@@ -66,6 +66,7 @@ fun App() {
     var recordedAudioPath by remember { mutableStateOf<String?>(null) }
     var isTranslating by remember { mutableStateOf(false) }
     var isGeneratingSummary by remember { mutableStateOf(false) }
+    var scribeErrorMessage by remember { mutableStateOf<String?>(null) }
     var selectedTargetLanguage by remember { mutableStateOf("Spanish") }
 
     // AI Intelligence state
@@ -358,6 +359,8 @@ fun App() {
                 audioFilePath = recordedAudioPath,
                 isTranslating = isTranslating,
                 isGeneratingSummary = isGeneratingSummary,
+                errorMessage = scribeErrorMessage,
+                onDismissError = { scribeErrorMessage = null },
                 selectedTargetLanguage = selectedTargetLanguage,
                 onTargetLanguageChanged = { selectedTargetLanguage = it },
                 onTranslateClicked = {
@@ -457,12 +460,14 @@ fun App() {
                                         }
                                         is NetworkResult.Error -> {
                                             println("MEL_AI_WHISPER_NOTE: Whisper response: ${whisperRes.error.message}")
+                                            scribeErrorMessage = "Whisper STT Error (${whisperRes.error.code}): ${whisperRes.error.message}"
                                         }
                                         else -> {}
                                     }
                                 }
                             } catch (e: Exception) {
                                 println("MEL_AI_WHISPER_EXCEPTION: ${e.message}")
+                                scribeErrorMessage = "Whisper STT Exception: ${e.message}"
                             }
                         }
                         isTranscribing = false
@@ -496,14 +501,17 @@ fun App() {
                 },
                 onViewSummaryClicked = {
                     coroutineScope.launch {
+                        scribeErrorMessage = null
                         isGeneratingSummary = true
                         try {
                             println("MEL_AI_FLOW: Initiating clinical summary synthesis for ${transcriptSegments.size} segments...")
                             val intelligenceRes = intelligenceEngine.generateVisitSummary(
                                 consultationId = "cons-001",
-                                segments = transcriptSegments
+                                segments = transcriptSegments,
+                                readingLevel = patientProfileData.summaryDetailLevel
                             )
                             intelligenceRes.onSuccess { (summary, questions) ->
+                                scribeErrorMessage = null
                                 println("MEL_AI_FLOW: Summary generated successfully! Diagnoses: ${summary.diagnosesExplicit}")
                                 currentSummary = summary
                                 currentQuestions = questions
@@ -521,7 +529,9 @@ fun App() {
                                 historyVisits = historyService.getPatientTimeline(currentPatientId ?: "patient-id")
                                 currentScreen = Screen.Summary
                             }.onFailure { err ->
-                                println("MEL_AI_FLOW_ERROR: Summary synthesis failed: ${err.message}")
+                                val errorMsg = err.message ?: "Failed to generate clinical summary from AI backend."
+                                println("MEL_AI_FLOW_ERROR: Summary synthesis failed: $errorMsg")
+                                scribeErrorMessage = errorMsg
                             }
                         } finally {
                             isGeneratingSummary = false

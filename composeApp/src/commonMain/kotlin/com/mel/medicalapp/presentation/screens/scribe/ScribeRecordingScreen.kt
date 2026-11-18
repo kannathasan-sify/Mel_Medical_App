@@ -41,6 +41,8 @@ fun ScribeRecordingScreen(
     audioFilePath: String? = null,
     isTranslating: Boolean = false,
     isGeneratingSummary: Boolean = false,
+    errorMessage: String? = null,
+    onDismissError: () -> Unit = {},
     selectedTargetLanguage: String = "Spanish",
     onTargetLanguageChanged: (String) -> Unit = {},
     onTranslateClicked: () -> Unit = {},
@@ -125,6 +127,41 @@ fun ScribeRecordingScreen(
             Column(modifier = Modifier.fillMaxWidth()) {
                 EmergencySafetyAnchor(emergencyNumber = "911", onEmergencyCallClicked = { /* Call 911 */ })
                 Spacer(modifier = Modifier.height(10.dp))
+
+                if (!errorMessage.isNullOrBlank()) {
+                    Card(
+                        shape = RoundedCornerShape(12.dp),
+                        colors = CardDefaults.cardColors(containerColor = MelColors.CoralPink.copy(alpha = 0.12f)),
+                        border = BorderStroke(1.5.dp, MelColors.CoralPink),
+                        modifier = Modifier.fillMaxWidth().padding(bottom = 10.dp)
+                    ) {
+                        Row(
+                            modifier = Modifier.padding(12.dp),
+                            verticalAlignment = Alignment.CenterVertically
+                        ) {
+                            Text("⚠️", fontSize = 20.sp)
+                            Spacer(modifier = Modifier.width(10.dp))
+                            Column(modifier = Modifier.weight(1f)) {
+                                Text(
+                                    text = "API / Clinical System Error",
+                                    fontWeight = FontWeight.Bold,
+                                    fontSize = 13.sp,
+                                    color = MelColors.CoralPink
+                                )
+                                Spacer(modifier = Modifier.height(2.dp))
+                                Text(
+                                    text = errorMessage,
+                                    fontSize = 12.sp,
+                                    color = MelColors.DeepBlue,
+                                    lineHeight = 16.sp
+                                )
+                            }
+                            IconButton(onClick = onDismissError) {
+                                Text("✕", fontSize = 14.sp, fontWeight = FontWeight.Bold, color = MelColors.DeepBlue)
+                            }
+                        }
+                    }
+                }
 
                 Card(
                     shape = RoundedCornerShape(12.dp),

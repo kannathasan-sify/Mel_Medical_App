@@ -40,6 +40,7 @@ fun LearnScreen(
     var selectedCategory by remember { mutableStateOf("All") }
     var expandedTermId by remember { mutableStateOf<String?>(null) }
     var isSearchingAi by remember { mutableStateOf(false) }
+    var searchErrorMessage by remember { mutableStateOf<String?>(null) }
 
     val coroutineScope = rememberCoroutineScope()
     val backendApiClient = remember { MelBackendApiClient() }
@@ -215,45 +216,18 @@ fun LearnScreen(
         )
     }
 
-    fun generateClientFallbackExplanation(term: String): MedicalTermExplanation {
-        val cleanTerm = term.trim().capitalizeWords()
-        val lower = cleanTerm.lowercase()
-        val cat = when {
-            lower.contains("cardio") || lower.contains("heart") || lower.contains("arter") || lower.contains("blood pressure") || lower.contains("pulse") -> "Heart & Vessels"
-            lower.contains("sugar") || lower.contains("diabet") || lower.contains("insulin") || lower.contains("metabol") -> "Diabetes & Metabolism"
-            lower.contains("kidney") || lower.contains("nephr") || lower.contains("urine") || lower.contains("bladder") -> "Kidney & Bladder"
-            lower.contains("pill") || lower.contains("tab") || lower.contains("mg") || lower.contains("statin") || lower.contains("cillin") || lower.contains("antibiotic") -> "Medications & Rx"
-            lower.contains("scan") || lower.contains("ray") || lower.contains("mri") || lower.contains("ct") || lower.contains("echo") || lower.contains("panel") || lower.contains("lab") || lower.contains("count") -> "Imaging & Tests"
-            else -> "General Health"
-        }
-
-        return MedicalTermExplanation(
-            id = "ai-term-${cleanTerm.hashCode()}",
-            term = cleanTerm,
-            pronunciation = cleanTerm,
-            plainMeaning = "A clinical finding, diagnostic test, or medication referenced during medical care regarding $cleanTerm. Understanding this empowers you to collaborate more closely with your physician and avoid misunderstandings.",
-            whyItMatters = "Knowledge of $cleanTerm helps ensure your symptoms are accurately discussed, medical tests are clear, and treatment plans are followed safely.",
-            doctorQuestions = listOf(
-                "How does $cleanTerm specifically relate to my health symptoms or lab results?",
-                "Are there specific target numbers or warning signs regarding $cleanTerm I should track at home?",
-                "What are the recommended medical next steps or medication adjustments?",
-                "When should we re-evaluate this in our next follow-up appointment?"
-            ),
-            category = cat
-        )
-    }
-
     fun searchAndExplainWithAi(query: String) {
         if (query.isBlank()) return
         val termToLookup = query.trim()
         coroutineScope.launch {
+            searchErrorMessage = null
             isSearchingAi = true
             try {
                 val res = backendApiClient.explainMedicalTerm(termToLookup)
-                val explanation = when (res) {
+                when (res) {
                     is NetworkResult.Success -> {
                         val data = res.data
-                        MedicalTermExplanation(
+                        val explanation = MedicalTermExplanation(
                             id = "ai-term-${data.term.hashCode()}",
                             term = data.term.capitalizeWords(),
                             pronunciation = data.pronunciation.ifBlank { data.term },
@@ -268,17 +242,17 @@ fun LearnScreen(
                             },
                             category = data.category
                         )
+                        allTerms.removeAll { it.term.equals(explanation.term, ignoreCase = true) }
+                        allTerms.add(0, explanation)
+                        expandedTermId = explanation.id
                     }
-                    else -> generateClientFallbackExplanation(termToLookup)
+                    is NetworkResult.Error -> {
+                        searchErrorMessage = "AI Term Search Error (${res.error.code}): ${res.error.message}"
+                    }
+                    NetworkResult.Loading -> {}
                 }
-                allTerms.removeAll { it.term.equals(explanation.term, ignoreCase = true) }
-                allTerms.add(0, explanation)
-                expandedTermId = explanation.id
-            } catch (_: Exception) {
-                val fallback = generateClientFallbackExplanation(termToLookup)
-                allTerms.removeAll { it.term.equals(fallback.term, ignoreCase = true) }
-                allTerms.add(0, fallback)
-                expandedTermId = fallback.id
+            } catch (e: Exception) {
+                searchErrorMessage = "Request Failed: ${e.message}"
             } finally {
                 isSearchingAi = false
             }
@@ -331,6 +305,41 @@ fun LearnScreen(
                 .padding(innerPadding)
                 .padding(horizontal = 16.dp, vertical = 10.dp)
         ) {
+            if (!searchErrorMessage.isNullOrBlank()) {
+                Card(
+                    shape = RoundedCornerShape(12.dp),
+                    colors = CardDefaults.cardColors(containerColor = MelColors.CoralPink.copy(alpha = 0.12f)),
+                    border = BorderStroke(1.5.dp, MelColors.CoralPink),
+                    modifier = Modifier.fillMaxWidth().padding(bottom = 10.dp)
+                ) {
+                    Row(
+                        modifier = Modifier.padding(12.dp),
+                        verticalAlignment = Alignment.CenterVertically
+                    ) {
+                        Text("⚠️", fontSize = 20.sp)
+                        Spacer(modifier = Modifier.width(10.dp))
+                        Column(modifier = Modifier.weight(1f)) {
+                            Text(
+                                text = "Medical Encyclopedia API Error",
+                                fontWeight = FontWeight.Bold,
+                                fontSize = 13.sp,
+                                color = MelColors.CoralPink
+                            )
+                            Spacer(modifier = Modifier.height(2.dp))
+                            Text(
+                                text = searchErrorMessage ?: "",
+                                fontSize = 12.sp,
+                                color = MelColors.DeepBlue,
+                                lineHeight = 16.sp
+                            )
+                        }
+                        IconButton(onClick = { searchErrorMessage = null }) {
+                            Text("✕", fontSize = 14.sp, fontWeight = FontWeight.Bold, color = MelColors.DeepBlue)
+                        }
+                    }
+                }
+            }
+
             // Search Input with Action Button
             Row(
                 modifier = Modifier.fillMaxWidth(),
