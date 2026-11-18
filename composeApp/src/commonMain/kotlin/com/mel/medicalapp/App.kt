@@ -506,10 +506,40 @@ fun App() {
                         scribeErrorMessage = null
                         isGeneratingSummary = true
                         try {
-                            println("MEL_AI_FLOW: Initiating clinical summary synthesis for ${transcriptSegments.size} segments...")
+                            var currentSegments = transcriptSegments
+                            // If segments are empty but audio was recorded, auto-transcribe it via Whisper first!
+                            if (currentSegments.isEmpty() && !recordedAudioPath.isNullOrBlank()) {
+                                try {
+                                    val file = java.io.File(recordedAudioPath!!)
+                                    if (file.exists() && file.length() > 0) {
+                                        println("MEL_AI_FLOW: 0 live turns, transcribing recorded audio (${file.length()} bytes) via Whisper STT...")
+                                        val whisperRes = backendApiClient.transcribeAudio(file.readBytes(), file.name)
+                                        if (whisperRes is NetworkResult.Success && whisperRes.data.isNotBlank()) {
+                                            val recognizedText = whisperRes.data.trim()
+                                            println("MEL_AI_FLOW: Auto-transcription succeeded: \"$recognizedText\"")
+                                            val seg = TranscriptSegment(
+                                                id = "seg-whisper-1",
+                                                consultationId = "cons-001",
+                                                sequenceOrder = 1,
+                                                startTimeMs = 0L,
+                                                endTimeMs = (elapsedSeconds * 1000).toLong(),
+                                                speaker = SpeakerRole.PATIENT,
+                                                text = recognizedText,
+                                                confidence = 0.99
+                                            )
+                                            currentSegments = listOf(seg)
+                                            transcriptSegments = currentSegments
+                                        }
+                                    }
+                                } catch (e: Exception) {
+                                    println("MEL_AI_FLOW: Auto-transcribe error: ${e.message}")
+                                }
+                            }
+
+                            println("MEL_AI_FLOW: Initiating clinical summary synthesis for ${currentSegments.size} segments...")
                             val intelligenceRes = intelligenceEngine.generateVisitSummary(
                                 consultationId = "cons-001",
-                                segments = transcriptSegments,
+                                segments = currentSegments,
                                 readingLevel = patientProfileData.summaryDetailLevel
                             )
                             intelligenceRes.onSuccess { (summary, questions) ->

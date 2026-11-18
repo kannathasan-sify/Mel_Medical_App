@@ -271,10 +271,19 @@ fun ScribeRecordingScreen(
                                     color = if (recordingState == RecordingState.RECORDING) MelColors.DeepBlue else MelColors.TextMuted
                                 )
                                 Text(
-                                    text = if (recordingState == RecordingState.RECORDING) "🔴 Live Audio Scribe" else "Recording Paused",
+                                    text = when (recordingState) {
+                                        RecordingState.RECORDING -> "🔴 Live Audio Scribe"
+                                        RecordingState.PAUSED -> "⏸️ Recording Paused"
+                                        RecordingState.STOPPED -> "✅ Recording Finished"
+                                        else -> "Ready to Record"
+                                    },
                                     fontSize = 11.sp,
                                     fontWeight = FontWeight.SemiBold,
-                                    color = if (recordingState == RecordingState.RECORDING) MelColors.CoralPink else MelColors.TextMuted
+                                    color = when (recordingState) {
+                                        RecordingState.RECORDING -> MelColors.CoralPink
+                                        RecordingState.STOPPED -> MelColors.AquaGreen
+                                        else -> MelColors.TextMuted
+                                    }
                                 )
                             }
                         }
@@ -480,7 +489,7 @@ fun ScribeRecordingScreen(
                 Spacer(modifier = Modifier.height(6.dp))
 
                 // Speaker Selection & Real-time Indicator
-                if (recordingState == RecordingState.RECORDING) {
+                if (recordingState != RecordingState.IDLE) {
                     Row(
                         modifier = Modifier.fillMaxWidth(),
                         horizontalArrangement = Arrangement.spacedBy(8.dp)
@@ -517,7 +526,7 @@ fun ScribeRecordingScreen(
                         OutlinedTextField(
                             value = manualInputText,
                             onValueChange = { manualInputText = it },
-                            placeholder = { Text("Speak or type spoken statement...", fontSize = 12.sp) },
+                            placeholder = { Text("Type symptoms or spoken words (e.g. fever, headache)...", fontSize = 11.sp) },
                             modifier = Modifier.weight(1f),
                             shape = RoundedCornerShape(10.dp),
                             singleLine = true,
