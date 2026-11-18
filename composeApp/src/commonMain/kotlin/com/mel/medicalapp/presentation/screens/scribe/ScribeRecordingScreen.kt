@@ -451,7 +451,28 @@ fun ScribeRecordingScreen(
                         Row(verticalAlignment = Alignment.CenterVertically) {
                             CircularProgressIndicator(modifier = Modifier.size(14.dp), strokeWidth = 2.dp, color = MelColors.AquaGreen)
                             Spacer(modifier = Modifier.width(6.dp))
-                            Text("Analyzing...", fontSize = 11.sp, color = MelColors.AquaGreen)
+                            Text("Transcribing Audio with Whisper...", fontSize = 11.sp, color = MelColors.AquaGreen, fontWeight = FontWeight.Bold)
+                        }
+                    }
+                }
+
+                if (isTranscribing) {
+                    Card(
+                        shape = RoundedCornerShape(10.dp),
+                        colors = CardDefaults.cardColors(containerColor = MelColors.AquaGreen.copy(alpha = 0.12f)),
+                        border = BorderStroke(1.dp, MelColors.AquaGreen),
+                        modifier = Modifier.fillMaxWidth().padding(top = 4.dp, bottom = 4.dp)
+                    ) {
+                        Row(
+                            modifier = Modifier.padding(10.dp),
+                            verticalAlignment = Alignment.CenterVertically
+                        ) {
+                            CircularProgressIndicator(modifier = Modifier.size(16.dp), strokeWidth = 2.dp, color = MelColors.AquaGreen)
+                            Spacer(modifier = Modifier.width(10.dp))
+                            Column {
+                                Text("Whisper AI Cloud Speech-to-Text", fontWeight = FontWeight.Bold, fontSize = 12.sp, color = MelColors.DeepBlue)
+                                Text("Uploading recorded voice to Whisper API on Render. Please hold on...", fontSize = 11.sp, color = MelColors.TextMuted)
+                            }
                         }
                     }
                 }

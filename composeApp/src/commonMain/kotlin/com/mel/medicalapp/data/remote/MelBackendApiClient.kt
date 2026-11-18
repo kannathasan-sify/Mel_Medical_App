@@ -117,28 +117,38 @@ class MelBackendApiClient(
         audioBytes: ByteArray,
         filename: String = "recording.m4a"
     ): NetworkResult<String> {
-        return try {
-            val response: HttpResponse = httpClient.submitFormWithBinaryData(
-                url = "$baseUrl/api/v1/consultations/transcribe",
-                formData = formData {
-                    append("file", audioBytes, Headers.build {
-                        append(HttpHeaders.ContentType, "audio/m4a")
-                        append(HttpHeaders.ContentDisposition, "filename=\"$filename\"")
-                    })
+        var lastException: Exception? = null
+        for (attempt in 1..2) {
+            try {
+                val response: HttpResponse = httpClient.submitFormWithBinaryData(
+                    url = "$baseUrl/api/v1/consultations/transcribe",
+                    formData = formData {
+                        append("file", audioBytes, Headers.build {
+                            append(HttpHeaders.ContentType, "audio/m4a")
+                            append(HttpHeaders.ContentDisposition, "filename=\"$filename\"")
+                        })
+                    }
+                )
+                if (response.status.isSuccess()) {
+                    val data = response.body<BackendTranscriptionResponse>()
+                    println("MEL_BACKEND_WHISPER: Received transcription: \"${data.text}\"")
+                    return NetworkResult.Success(data.text)
+                } else {
+                    val err = response.bodyAsText()
+                    println("MEL_BACKEND_WHISPER: Transcription error response: $err")
+                    return NetworkResult.Error(AppError.serverError("Transcription failed: ${response.status} - $err"))
                 }
-            )
-            if (response.status.isSuccess()) {
-                val data = response.body<BackendTranscriptionResponse>()
-                println("MEL_BACKEND_WHISPER: Received transcription: \"${data.text}\"")
-                NetworkResult.Success(data.text)
-            } else {
-                val err = response.bodyAsText()
-                println("MEL_BACKEND_WHISPER: Transcription error response: $err")
-                NetworkResult.Error(AppError.serverError("Transcription failed: ${response.status}"))
+            } catch (e: Exception) {
+                lastException = e
+                println("MEL_BACKEND_WHISPER: Attempt $attempt failed (${e.message}). Retrying...")
             }
-        } catch (e: Exception) {
-            println("MEL_BACKEND_WHISPER: Network error transcribing audio: ${e.message}")
-            NetworkResult.Error(AppError.networkError("Transcription network error: ${e.message}"))
         }
+        val msg = lastException?.message ?: "Unknown network error"
+        val friendlyMsg = if (msg.contains("timeout", ignoreCase = true)) {
+            "Connection timed out. The Render cloud server may have been sleeping (cold start). The server is now awake—please tap 'End & Transcribe' to retry."
+        } else {
+            "Transcription network error: $msg"
+        }
+        return NetworkResult.Error(AppError.networkError(friendlyMsg))
     }
 }

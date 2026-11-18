@@ -1,6 +1,7 @@
 package com.mel.medicalapp.data.remote
 
 import io.ktor.client.*
+import io.ktor.client.plugins.HttpTimeout
 import io.ktor.client.plugins.contentnegotiation.*
 import io.ktor.client.plugins.logging.*
 import io.ktor.serialization.kotlinx.json.*
@@ -21,6 +22,11 @@ object KtorClientFactory {
             install(ContentNegotiation) {
                 json(createJson())
             }
+            install(HttpTimeout) {
+                requestTimeoutMillis = 120_000L
+                connectTimeoutMillis = 90_000L
+                socketTimeoutMillis = 120_000L
+            }
             install(Logging) {
                 logger = Logger.DEFAULT
                 level = LogLevel.INFO
@@ -28,4 +34,3 @@ object KtorClientFactory {
         }
     }
 }
-

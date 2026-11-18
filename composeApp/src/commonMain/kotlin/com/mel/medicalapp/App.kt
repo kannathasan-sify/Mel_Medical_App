@@ -410,6 +410,7 @@ fun App() {
                     elapsedSeconds = 0
                     transcriptSegments = emptyList()
                     recordedAudioPath = null
+                    scribeErrorMessage = null
                     coroutineScope.launch {
                         audioRecorder.startRecording("consultation_audio.m4a")
                     }
@@ -425,6 +426,7 @@ fun App() {
                     }
                 },
                 onStopClicked = {
+                    scribeErrorMessage = null
                     coroutineScope.launch {
                         val stopRes = audioRecorder.stopRecording()
                         val filePath = stopRes.getOrNull() ?: ""
