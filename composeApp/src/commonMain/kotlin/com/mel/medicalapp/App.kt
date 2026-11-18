@@ -41,11 +41,11 @@ fun App() {
     val coroutineScope = rememberCoroutineScope()
     val secureStorage = remember { com.mel.medicalapp.core.security.SecureStorage() }
     val supabaseRepo = remember { SupabasePatientRepository() }
-    val speechEngine = remember { ClinicalSpeechToTextEngine(supabaseRepo) }
-    val intelligenceEngine = remember { ClinicalIntelligenceEngine(supabaseRepo) }
-    val historyService = remember { PatientHistoryService(supabaseRepo, secureStorage) }
-    val audioRecorder = remember { createPlatformAudioRecorder() }
     val backendApiClient = remember { com.mel.medicalapp.data.remote.MelBackendApiClient() }
+    val speechEngine = remember { ClinicalSpeechToTextEngine(supabaseRepo) }
+    val intelligenceEngine = remember { ClinicalIntelligenceEngine(supabaseRepo, backendApiClient) }
+    val historyService = remember { PatientHistoryService(supabaseRepo, secureStorage, backendApiClient) }
+    val audioRecorder = remember { createPlatformAudioRecorder() }
 
     // Dynamic Account Profile state
     var patientProfileData by remember {

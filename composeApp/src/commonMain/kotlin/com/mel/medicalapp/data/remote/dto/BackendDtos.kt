@@ -76,3 +76,32 @@ data class BackendTranscriptionResponse(
     val status: String = ""
 )
 
+@Serializable
+data class BackendConsultationItem(
+    val id: String,
+    val patient_id: String? = null,
+    val provider_name: String? = null,
+    val visit_type: String? = null,
+    val status: String? = null,
+    val started_at: String? = null,
+    val created_at: String? = null,
+    val visit_summaries: List<BackendVisitSummaryDetail> = emptyList()
+)
+
+@Serializable
+data class BackendVisitSummaryDetail(
+    val id: String? = null,
+    val plain_language_overview: String? = null,
+    val symptoms_reported: List<String> = emptyList(),
+    val diagnoses_explicit: List<String> = emptyList(),
+    val treatment_plan: List<String> = emptyList(),
+    val unanswered_questions: List<String> = emptyList()
+)
+
+@Serializable
+data class BackendPatientConsultationsResponse(
+    val patient_id: String,
+    val consultations: List<BackendConsultationItem> = emptyList()
+)
+
+

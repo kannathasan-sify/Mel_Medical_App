@@ -156,4 +156,52 @@ class MelBackendApiClient(
         }
         return NetworkResult.Error(AppError.networkError(friendlyMsg))
     }
+
+    /**
+     * Retrieves historical visits and consultations stored in Supabase via the backend API.
+     */
+    suspend fun getPatientConsultations(
+        patientId: String
+    ): NetworkResult<List<BackendConsultationItem>> {
+        return try {
+            val response = try {
+                httpClient.get("$baseUrl/api/v1/consultations/patient/$patientId")
+            } catch (e: Exception) {
+                httpClient.get("${AppConfig.BACKEND_URL_FALLBACK}/api/v1/consultations/patient/$patientId")
+            }
+
+            if (response.status.isSuccess()) {
+                val data = response.body<BackendPatientConsultationsResponse>()
+                NetworkResult.Success(data.consultations)
+            } else {
+                val err = response.bodyAsText()
+                NetworkResult.Error(AppError.serverError("Failed to fetch consultations ($err)"))
+            }
+        } catch (e: Exception) {
+            NetworkResult.Error(AppError.networkError("Could not retrieve patient visits: ${e.message}"))
+        }
+    }
+
+    /**
+     * Deletes a consultation and its associated records from Supabase via the backend API.
+     */
+    suspend fun deleteConsultation(
+        consultationId: String
+    ): NetworkResult<Boolean> {
+        return try {
+            val response = try {
+                httpClient.delete("$baseUrl/api/v1/consultations/$consultationId")
+            } catch (e: Exception) {
+                httpClient.delete("${AppConfig.BACKEND_URL_FALLBACK}/api/v1/consultations/$consultationId")
+            }
+
+            if (response.status.isSuccess()) {
+                NetworkResult.Success(true)
+            } else {
+                NetworkResult.Error(AppError.serverError("Failed to delete consultation (${response.status})"))
+            }
+        } catch (e: Exception) {
+            NetworkResult.Error(AppError.networkError("Failed to delete consultation: ${e.message}"))
+        }
+    }
 }

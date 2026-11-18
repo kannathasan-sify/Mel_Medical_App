@@ -23,6 +23,7 @@ from src.schemas.consultation import (
     ExplainTermResponse
 )
 from src.services.ai.clinical_synthesizer import ClinicalIntelligenceService
+from src.core.supabase import supabase_service
 
 router = APIRouter(prefix="/consultations", tags=["Consultations & AI Intelligence"])
 ai_service = ClinicalIntelligenceService()
@@ -54,6 +55,19 @@ async def create_consultation(payload: ConsultationCreate):
     )
     _consultations_db[cid] = consultation
     _transcripts_db[cid] = []
+
+    # Persist in Supabase consultations table
+    try:
+        supabase_service.save_consultation(
+            consultation_id=cid,
+            patient_id=consultation.patient_id,
+            visit_type=consultation.title,
+            provider_name=consultation.doctor_name,
+            status="CREATED"
+        )
+    except Exception as e:
+        pass
+
     return consultation
 
 @router.post("/{consultation_id}/start", response_model=ConsultationResponse)
@@ -260,6 +274,73 @@ async def synthesize_consultation_endpoint(request: SynthesisRequest):
     )
 
     _summaries_db[request.consultation_id] = response
+
+    # Persist all clinical data directly in Supabase tables
+    try:
+        primary_diag = result.get("diagnoses_explicit", ["Clinical Consultation"])[0] if result.get("diagnoses_explicit") else "Clinical Consultation"
+        # 1. Upsert patient profile
+        supabase_service.save_patient_profile(
+            patient_id=request.patient_id,
+            email="patient@melapp.com",
+            full_name="Patient"
+        )
+
+        # 2. Save consultation
+        supabase_service.save_consultation(
+            consultation_id=request.consultation_id,
+            patient_id=request.patient_id,
+            visit_type=primary_diag,
+            provider_name="Attending Clinician",
+            status="COMPLETED"
+        )
+
+        # 3. Save transcript segments
+        parsed_segments = []
+        for line in request.transcript_text.splitlines():
+            line_str = line.strip()
+            if not line_str:
+                continue
+            speaker = "PATIENT"
+            text_str = line_str
+            if line_str.startswith("[DOCTOR]:") or line_str.startswith("Doctor:") or line_str.startswith("Provider:"):
+                speaker = "PROVIDER"
+                text_str = line_str.split(":", 1)[1].strip()
+            elif line_str.startswith("[PATIENT]:") or line_str.startswith("Patient:"):
+                speaker = "PATIENT"
+                text_str = line_str.split(":", 1)[1].strip()
+            parsed_segments.append({
+                "speaker": speaker,
+                "text": text_str,
+                "startTimeMs": 0,
+                "endTimeMs": 0,
+                "confidence": 0.98
+            })
+        if parsed_segments:
+            supabase_service.save_transcript_segments(request.consultation_id, parsed_segments)
+
+        # 4. Save visit summary
+        saved_summary = supabase_service.save_visit_summary(
+            consultation_id=request.consultation_id,
+            plain_language_overview=result.get("plain_language_overview", ""),
+            symptoms_reported=result.get("symptoms_reported", []),
+            provider_explanations=result.get("provider_explanations", []),
+            diagnoses_explicit=result.get("diagnoses_explicit", []),
+            medications_discussed=[m.model_dump() for m in meds],
+            treatment_plan=result.get("treatment_plan", []),
+            unanswered_questions=result.get("unanswered_questions", [])
+        )
+
+        # 5. Save follow-up questions
+        summary_id = saved_summary.get("id") if saved_summary else request.consultation_id
+        if result.get("follow_up_questions"):
+            supabase_service.save_follow_up_questions(
+                summary_id=summary_id,
+                questions=result.get("follow_up_questions", [])
+            )
+        logger.info(f"Successfully persisted consultation {request.consultation_id} across Supabase tables.")
+    except Exception as persist_err:
+        logger.error(f"Failed to persist consultation to Supabase: {persist_err}")
+
     return response
 
 @router.post("/transcribe")
@@ -343,5 +424,22 @@ async def explain_medical_term_endpoint(request: ExplainTermRequest):
         commonSymptomsOrUses=result.get("commonSymptomsOrUses"),
         category=result.get("category", "General Health")
     )
+
+@router.get("/patient/{patient_id}")
+async def get_patient_consultations_endpoint(patient_id: str):
+    """
+    Retrieves all medical visits and consultations for the patient directly from Supabase tables.
+    """
+    records = supabase_service.get_patient_consultations(patient_id)
+    return {"patient_id": patient_id, "consultations": records}
+
+@router.delete("/{consultation_id}")
+async def delete_consultation_endpoint(consultation_id: str):
+    """
+    Deletes a consultation and its associated records from Supabase tables.
+    """
+    success = supabase_service.delete_consultation(consultation_id)
+    return {"consultation_id": consultation_id, "deleted": success}
+
 
 
