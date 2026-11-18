@@ -53,11 +53,12 @@ class ClinicalIntelligenceService:
         
         Strict Guidelines:
         1. Adapt explanations to reading comprehension level: {reading_level} (simple = 5th grade, moderate = 8th grade, complex = 12th grade).
-        2. Never invent diagnoses, treatments, or prescriptions. Only state explicitly discussed facts.
+        2. Never invent diagnoses, treatments, or prescriptions. Only state explicitly discussed facts. If the patient reports symptoms (such as fever, cough, pain) but a formal diagnosis was not explicitly stated by a provider, set diagnoses_explicit to include the clinical focus (e.g., ["Acute Febrile Evaluation"] or ["Symptom Assessment"]).
         3. Preserve clinical terminology alongside simple plain-language translations.
         4. Detect any medication swallowing difficulties or adherence concerns.
         5. Identify unanswered questions or gaps left in the conversation.
         6. Formulate 4 empathetic, respectful follow-up questions for the patient's next appointment.
+        7. All output fields MUST be returned strictly in clear, professional English. If the transcript has non-English or phonetic words, interpret and summarize them entirely in English.
         
         Prior Medical History Context:
         {history_context if history_context else "None provided."}

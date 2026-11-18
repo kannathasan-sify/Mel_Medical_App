@@ -127,6 +127,7 @@ class MelBackendApiClient(
                             append(HttpHeaders.ContentType, "audio/m4a")
                             append(HttpHeaders.ContentDisposition, "filename=\"$filename\"")
                         })
+                        append("language", "en")
                     }
                 )
                 if (response.status.isSuccess()) {

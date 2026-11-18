@@ -263,10 +263,13 @@ async def synthesize_consultation_endpoint(request: SynthesisRequest):
     return response
 
 @router.post("/transcribe")
-async def transcribe_audio_endpoint(file: UploadFile = File(...)):
+async def transcribe_audio_endpoint(
+    file: UploadFile = File(...),
+    language: Optional[str] = Form("en")
+):
     """
     Transcribes actual recorded audio using OpenAI Whisper (whisper-1).
-    Raises real HTTP errors if unconfigured or failed.
+    Defaults strictly to English (language='en') to prevent non-English script misinterpretations.
     """
     client = ai_service.get_client()
     if not client:
@@ -276,9 +279,12 @@ async def transcribe_audio_endpoint(file: UploadFile = File(...)):
         )
     try:
         content = await file.read()
+        target_lang = language if language and language != "auto" else "en"
         transcription = await client.audio.transcriptions.create(
             model="whisper-1",
-            file=(file.filename or "recording.m4a", content, file.content_type or "audio/m4a")
+            file=(file.filename or "recording.m4a", content, file.content_type or "audio/m4a"),
+            language=target_lang,
+            prompt="Doctor and patient medical consultation in English discussing fever, symptoms, medications, and clinical care."
         )
         return {"text": transcription.text, "status": "success"}
     except Exception as e:
