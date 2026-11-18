@@ -115,7 +115,8 @@ class MelBackendApiClient(
      */
     suspend fun transcribeAudio(
         audioBytes: ByteArray,
-        filename: String = "recording.m4a"
+        filename: String = "recording.m4a",
+        prompt: String? = null
     ): NetworkResult<String> {
         var lastException: Exception? = null
         for (attempt in 1..2) {
@@ -128,6 +129,9 @@ class MelBackendApiClient(
                             append(HttpHeaders.ContentDisposition, "filename=\"$filename\"")
                         })
                         append("language", "en")
+                        if (!prompt.isNullOrBlank()) {
+                            append("prompt", prompt)
+                        }
                     }
                 )
                 if (response.status.isSuccess()) {

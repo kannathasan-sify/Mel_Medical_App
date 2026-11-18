@@ -439,8 +439,13 @@ fun App() {
                             try {
                                 val file = java.io.File(filePath)
                                 if (file.exists() && file.length() > 0) {
-                                    println("MEL_AI_WHISPER: Sending recorded audio (${file.length()} bytes) to Whisper STT API...")
-                                    val whisperRes = backendApiClient.transcribeAudio(file.readBytes(), file.name)
+                                    val dynamicPrompt = if (segments.isNotEmpty()) {
+                                        "Doctor and patient clinical consultation in English. Context: " + segments.takeLast(2).joinToString { it.text }
+                                    } else {
+                                        "Doctor and patient clinical medical consultation in English discussing symptoms, diagnoses, medications, and healthcare instructions."
+                                    }
+                                    println("MEL_AI_WHISPER: Sending recorded audio (${file.length()} bytes) with dynamic prompt to Whisper STT API...")
+                                    val whisperRes = backendApiClient.transcribeAudio(file.readBytes(), file.name, prompt = dynamicPrompt)
                                     when (whisperRes) {
                                         is NetworkResult.Success -> {
                                             val recognizedText = whisperRes.data.trim()
@@ -512,8 +517,13 @@ fun App() {
                                 try {
                                     val file = java.io.File(recordedAudioPath!!)
                                     if (file.exists() && file.length() > 0) {
-                                        println("MEL_AI_FLOW: 0 live turns, transcribing recorded audio (${file.length()} bytes) via Whisper STT...")
-                                        val whisperRes = backendApiClient.transcribeAudio(file.readBytes(), file.name)
+                                        val dynamicPrompt = if (currentSegments.isNotEmpty()) {
+                                            "Doctor and patient clinical consultation in English. Context: " + currentSegments.takeLast(2).joinToString { it.text }
+                                        } else {
+                                            "Doctor and patient clinical medical consultation in English discussing symptoms, diagnoses, medications, and healthcare instructions."
+                                        }
+                                        println("MEL_AI_FLOW: 0 live turns, transcribing recorded audio (${file.length()} bytes) with dynamic prompt via Whisper STT...")
+                                        val whisperRes = backendApiClient.transcribeAudio(file.readBytes(), file.name, prompt = dynamicPrompt)
                                         if (whisperRes is NetworkResult.Success && whisperRes.data.isNotBlank()) {
                                             val recognizedText = whisperRes.data.trim()
                                             println("MEL_AI_FLOW: Auto-transcription succeeded: \"$recognizedText\"")
